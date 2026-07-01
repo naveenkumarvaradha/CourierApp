@@ -7,6 +7,15 @@ import DashboardPage from './pages/DashboardPage';
 import UsersPage from './pages/admin/UsersPage';
 import RolesPage from './pages/admin/RolesPage';
 import ApprovalRoutingPage from './pages/admin/ApprovalRoutingPage';
+import CompanySettingsPage from './pages/admin/CompanySettingsPage';
+import CourierWaysPage from './pages/admin/CourierWaysPage';
+import PackageTypesPage from './pages/admin/PackageTypesPage';
+import FlexFieldsPage from './pages/admin/FlexFieldsPage';
+import DepartmentsPage from './pages/admin/DepartmentsPage';
+import AuditLogsPage from './pages/admin/AuditLogsPage';
+import CompaniesPage from './pages/admin/CompaniesPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import PartiesPage from './pages/master/PartiesPage';
 import BookingsPage from './pages/booking/BookingsPage';
 import BookingFormPage from './pages/booking/BookingFormPage';
@@ -39,6 +48,8 @@ export default function App() {
     return (
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
@@ -71,6 +82,63 @@ export default function App() {
           element={
             <RequirePermission codes={['ADMIN_VIEW']}>
               <ApprovalRoutingPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="admin/company-settings"
+          element={
+            <RequirePermission codes={['ADMIN_VIEW']}>
+              <CompanySettingsPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="admin/courier-ways"
+          element={
+            <RequirePermission codes={['ADMIN_VIEW']}>
+              <CourierWaysPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="admin/package-types"
+          element={
+            <RequirePermission codes={['ADMIN_VIEW']}>
+              <PackageTypesPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="admin/flex-fields"
+          element={
+            <RequirePermission codes={['ADMIN_VIEW']}>
+              <FlexFieldsPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="admin/departments"
+          element={
+            <RequirePermission codes={['ADMIN_VIEW']}>
+              <DepartmentsPage />
+            </RequirePermission>
+          }
+        />
+
+        <Route
+          path="admin/audit-logs"
+          element={
+            <RequirePermission codes={['ADMIN_VIEW']}>
+              <AuditLogsPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="admin/companies"
+          element={
+            <RequirePermission codes={['ADMIN_VIEW']}>
+              <CompaniesPage />
             </RequirePermission>
           }
         />

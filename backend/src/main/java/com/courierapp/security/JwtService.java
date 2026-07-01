@@ -29,11 +29,12 @@ public class JwtService {
         this.refreshExpiryMs = refreshDays * 24L * 60L * 60_000L;
     }
 
-    public String generateAccessToken(String username, Long userId, List<String> authorities) {
+    public String generateAccessToken(String username, Long userId, Long companyId, List<String> authorities) {
         Date now = new Date();
         return Jwts.builder()
                 .subject(username)
                 .claim("uid", userId)
+                .claim("cid", companyId)
                 .claim("authorities", authorities)
                 .claim("type", "access")
                 .issuedAt(now)

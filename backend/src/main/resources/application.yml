@@ -30,6 +30,17 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:your-email@gmail.com}
+    password: ${MAIL_PASSWORD:your-app-password}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 app:
   jwt:
@@ -37,7 +48,9 @@ app:
     access-token-expiry-minutes: 30
     refresh-token-expiry-days: 7
   cors:
-    allowed-origins: ${CORS_ORIGINS:http://localhost:5173}
+    allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://tkllt031:5173,http://192.168.2.245:5173}
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  name: Courier Booking
   booking:
     number-prefix: CB
   pagination:

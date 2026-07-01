@@ -10,6 +10,11 @@ public record UserResponse(
         String email,
         String phone,
         boolean active,
+        Long departmentId,
+        String departmentName,
+        Long companyId,
+        String companyCode,
+        String companyName,
         List<RoleSummary> roles,
         List<PermissionResponse> directPermissions,
         Instant createdAt,
@@ -17,6 +22,5 @@ public record UserResponse(
         Instant updatedAt,
         String updatedBy
 ) {
-    public record RoleSummary(Long id, String name) {
-    }
+    public record RoleSummary(Long id, String name) {}
 }

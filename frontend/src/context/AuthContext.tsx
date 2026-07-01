@@ -6,7 +6,7 @@ import type { CurrentUser } from '../types';
 interface AuthContextValue {
   user: CurrentUser | null;
   loading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (companyCode: string, username: string, password: string) => Promise<void>;
   logout: () => void;
   hasPermission: (code: string) => boolean;
   hasAnyPermission: (codes: string[]) => boolean;
@@ -38,8 +38,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadUser();
   }, [loadUser]);
 
-  const login = useCallback(async (username: string, password: string) => {
-    const tokens = await authApi.login(username, password);
+  const login = useCallback(async (companyCode: string, username: string, password: string) => {
+    const tokens = await authApi.login(companyCode, username, password);
     tokenStore.set(tokens.accessToken, tokens.refreshToken);
     const me = await authApi.me();
     setUser(me);

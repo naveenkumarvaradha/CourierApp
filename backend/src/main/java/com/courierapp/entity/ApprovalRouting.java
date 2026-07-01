@@ -37,4 +37,8 @@ public class ApprovalRouting extends Auditable {
 
     @Column(name = "active", nullable = false)
     private boolean active;
+
+    /** BOOKING or MASTER — scopes this rule to a specific workflow. */
+    @Column(name = "module", nullable = false, length = 30)
+    private String module = "BOOKING";
 }

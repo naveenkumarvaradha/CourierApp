@@ -5,6 +5,7 @@ public record ApprovalRoutingRequest(
         Long userId,
         Long creatorRoleId,
         Long creatorUserId,
-        boolean active
+        boolean active,
+        String module
 ) {
 }

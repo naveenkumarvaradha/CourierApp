@@ -2,6 +2,7 @@ package com.courierapp.controller;
 
 import com.courierapp.dto.PageResponse;
 import com.courierapp.dto.booking.ApprovalDecisionRequest;
+import com.courierapp.dto.booking.AwbUpdateRequest;
 import com.courierapp.dto.booking.BookingRequest;
 import com.courierapp.dto.booking.BookingResponse;
 import com.courierapp.dto.booking.StatusUpdateRequest;
@@ -11,6 +12,7 @@ import com.courierapp.service.BookingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -24,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 
+@Slf4j
 @RestController
 @RequestMapping("/bookings")
 @Tag(name = "Courier Bookings")
@@ -107,6 +110,14 @@ public class BookingController {
     public BookingResponse changeStatus(@PathVariable Long id,
                                         @Valid @RequestBody StatusUpdateRequest request) {
         return bookingService.changeStatus(id, request);
+    }
+
+    @PutMapping("/{id}/awb")
+    @PreAuthorize("hasAuthority('BOOKING_UPDATE')")
+    @Operation(summary = "Set or update the AWB number on an APPROVED booking (required before sticker print)")
+    public BookingResponse updateAwb(@PathVariable Long id,
+                                     @Valid @RequestBody AwbUpdateRequest request) {
+        return bookingService.updateAwb(id, request);
     }
 
     @GetMapping(value = "/{id}/sticker", produces = MediaType.APPLICATION_PDF_VALUE)

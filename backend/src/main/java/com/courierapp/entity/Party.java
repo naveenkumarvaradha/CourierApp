@@ -1,5 +1,6 @@
 package com.courierapp.entity;
 
+import com.courierapp.enums.PartyStatus;
 import com.courierapp.enums.PartyType;
 import jakarta.persistence.*;
 import lombok.*;
@@ -56,4 +57,8 @@ public class Party extends Auditable {
 
     @Column(name = "active", nullable = false)
     private boolean active;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "party_status", nullable = false, length = 30)
+    private PartyStatus partyStatus;
 }

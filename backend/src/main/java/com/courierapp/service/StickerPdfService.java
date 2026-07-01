@@ -42,7 +42,8 @@ public class StickerPdfService {
             header.setAlignment(Element.ALIGN_CENTER);
             document.add(header);
 
-            Paragraph mode = new Paragraph(booking.getCourierMode().name() + "  |  "
+            String wayLabel = booking.getCourierWay() != null ? "  via " + booking.getCourierWay().getName() : "";
+            Paragraph mode = new Paragraph(booking.getCourierMode().name() + wayLabel + "  |  "
                     + booking.getPaymentMode().name(), BIG);
             mode.setAlignment(Element.ALIGN_CENTER);
             mode.setSpacingAfter(6);
@@ -71,14 +72,27 @@ public class StickerPdfService {
 
             document.add(divider());
 
-            // Barcode + booking number
-            byte[] barcodePng = BarcodeGenerator.code128Png(booking.getBookingNumber(), 480, 120);
+            // AWB number — large, prominent
+            Paragraph awbLabel = new Paragraph("AWB NO.", LABEL);
+            awbLabel.setAlignment(Element.ALIGN_CENTER);
+            document.add(awbLabel);
+
+            Font awbFont = new Font(Font.HELVETICA, 16, Font.BOLD);
+            Paragraph awbValue = new Paragraph(booking.getAwbNumber(), awbFont);
+            awbValue.setAlignment(Element.ALIGN_CENTER);
+            awbValue.setSpacingAfter(4);
+            document.add(awbValue);
+
+            document.add(divider());
+
+            // Barcode of AWB number + booking reference below
+            byte[] barcodePng = BarcodeGenerator.code128Png(booking.getAwbNumber(), 480, 120);
             Image barcode = Image.getInstance(barcodePng);
             barcode.scaleToFit(WIDTH - 40, 80);
             barcode.setAlignment(Element.ALIGN_CENTER);
             document.add(barcode);
 
-            Paragraph number = new Paragraph(booking.getBookingNumber(), BIG);
+            Paragraph number = new Paragraph("Booking Ref: " + booking.getBookingNumber(), SMALL);
             number.setAlignment(Element.ALIGN_CENTER);
             document.add(number);
 

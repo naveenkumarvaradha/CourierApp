@@ -26,6 +26,7 @@ import type { ApprovalRouting, Role, UserAccount } from '../../types';
 
 type CreatorKind = 'ANY' | 'ROLE' | 'USER';
 type ApproverKind = 'ROLE' | 'USER';
+type Module = 'BOOKING' | 'MASTER';
 
 export default function ApprovalRoutingPage() {
   const { notify } = useNotification();
@@ -40,6 +41,9 @@ export default function ApprovalRoutingPage() {
   const [creatorKind, setCreatorKind] = useState<CreatorKind>('ANY');
   const [creatorRoleId, setCreatorRoleId] = useState<number | ''>('');
   const [creatorUserId, setCreatorUserId] = useState<number | ''>('');
+
+  // Module scope
+  const [module, setModule] = useState<Module>('BOOKING');
 
   // Approver
   const [approverKind, setApproverKind] = useState<ApproverKind>('ROLE');
@@ -66,6 +70,7 @@ export default function ApprovalRoutingPage() {
   }, [load]);
 
   const resetForm = () => {
+    setModule('BOOKING');
     setCreatorKind('ANY');
     setCreatorRoleId('');
     setCreatorUserId('');
@@ -93,6 +98,7 @@ export default function ApprovalRoutingPage() {
         creatorRoleId: creatorKind === 'ROLE' ? Number(creatorRoleId) : null,
         creatorUserId: creatorKind === 'USER' ? Number(creatorUserId) : null,
         active: true,
+        module,
       });
       notify('Approval routing rule added', 'success');
       setOpen(false);
@@ -116,8 +122,16 @@ export default function ApprovalRoutingPage() {
 
   const columns: GridColDef<ApprovalRouting>[] = [
     {
+      field: 'module',
+      headerName: 'Module',
+      width: 110,
+      renderCell: (p) => (
+        <Chip size="small" label={p.row.module ?? 'BOOKING'} color={p.row.module === 'MASTER' ? 'secondary' : 'primary'} variant="outlined" />
+      ),
+    },
+    {
       field: 'creator',
-      headerName: 'Booking Created By',
+      headerName: 'Created By',
       flex: 1,
       renderCell: (p) => {
         const label = p.row.creatorUsername ?? p.row.creatorRoleName;
@@ -182,7 +196,7 @@ export default function ApprovalRoutingPage() {
       </Stack>
 
       <Typography variant="body2" color="text.secondary">
-        Each rule maps: "when a booking is created by [specific user / role / anyone], it must be
+        Each rule maps: "when a record in [module] is created by [specific user / role / anyone], it must be
         approved by [designated approver]". Specific-user rules take priority over role rules.
       </Typography>
 
@@ -201,9 +215,22 @@ export default function ApprovalRoutingPage() {
         <DialogTitle>Add Approval Routing Rule</DialogTitle>
         <DialogContent>
           <Stack spacing={2} mt={1}>
+            {/* ── Module ── */}
+            <FormControl fullWidth size="small">
+              <InputLabel>Module</InputLabel>
+              <Select
+                label="Module"
+                value={module}
+                onChange={(e) => setModule(e.target.value as Module)}
+              >
+                <MenuItem value="BOOKING">Booking</MenuItem>
+                <MenuItem value="MASTER">Master (Parties)</MenuItem>
+              </Select>
+            </FormControl>
+
             {/* ── Creator scope ── */}
             <Typography variant="subtitle2" color="text.secondary">
-              When booking is created by…
+              When record is created by…
             </Typography>
 
             <FormControl fullWidth size="small">

@@ -1,5 +1,6 @@
 package com.courierapp.dto.master;
 
+import com.courierapp.enums.PartyStatus;
 import com.courierapp.enums.PartyType;
 
 import java.time.Instant;
@@ -19,6 +20,7 @@ public record PartyResponse(
         String gstin,
         PartyType partyType,
         boolean active,
+        PartyStatus partyStatus,
         Instant createdAt,
         String createdBy,
         Instant updatedAt,

@@ -1,3 +1,21 @@
+export interface Company {
+  id: number;
+  companyCode: string;
+  name: string;
+  active: boolean;
+}
+
+export interface AuditLog {
+  id: number;
+  module: string;
+  action: string;
+  entityId: number | null;
+  entityName: string | null;
+  performedBy: string;
+  details: string | null;
+  createdAt: string;
+}
+
 export interface TokenResponse {
   accessToken: string;
   refreshToken: string;
@@ -10,6 +28,9 @@ export interface CurrentUser {
   username: string;
   fullName: string;
   email: string;
+  companyId: number | null;
+  companyCode: string | null;
+  companyName: string | null;
   roles: string[];
   permissions: string[];
 }
@@ -52,6 +73,11 @@ export interface UserAccount {
   email: string;
   phone: string | null;
   active: boolean;
+  departmentId: number | null;
+  departmentName: string | null;
+  companyId: number | null;
+  companyCode: string | null;
+  companyName: string | null;
   roles: RoleSummary[];
   directPermissions: Permission[];
   createdAt: string;
@@ -71,9 +97,11 @@ export interface ApprovalRouting {
   creatorUserId: number | null;
   creatorUsername: string | null;
   active: boolean;
+  module: string;
 }
 
 export type PartyType = 'SENDER' | 'RECEIVER' | 'BOTH';
+export type PartyStatus = 'PENDING_APPROVAL' | 'ACTIVE' | 'INACTIVE' | 'REJECTED';
 
 export interface Party {
   id: number;
@@ -90,7 +118,65 @@ export interface Party {
   gstin: string | null;
   partyType: PartyType;
   active: boolean;
+  partyStatus: PartyStatus;
+  createdBy: string | null;
 }
+
+export interface CompanySettings {
+  id: number;
+  companyName: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  pincode: string;
+  country: string;
+  phone: string | null;
+  email: string | null;
+  gstin: string | null;
+}
+
+export interface CourierWay {
+  id: number;
+  name: string;
+  active: boolean;
+}
+
+export interface Department {
+  id: number;
+  name: string;
+  active: boolean;
+}
+
+export interface PackageType {
+  id: number;
+  name: string;
+  active: boolean;
+}
+
+export type FlexFieldType = 'TEXT' | 'DROPDOWN_SINGLE' | 'DROPDOWN_MULTI';
+
+export interface FlexFieldOption {
+  id: number;
+  optionValue: string;
+  sortOrder: number;
+  active: boolean;
+}
+
+export interface FlexFieldDefinition {
+  id: number;
+  module: string;
+  fieldName: string;
+  fieldLabel: string;
+  fieldType: FlexFieldType;
+  required: boolean;
+  active: boolean;
+  sortOrder: number;
+  options: FlexFieldOption[];
+}
+
+/** fieldId → raw value */
+export type FlexFieldValues = Record<number, string>;
 
 export type CourierMode = 'AIR' | 'SURFACE' | 'EXPRESS';
 export type PaymentMode = 'PREPAID' | 'TOPAY';
@@ -109,19 +195,20 @@ export interface Booking {
   bookingDate: string;
   sender: Party;
   receiver: Party;
+  courierWay: CourierWay | null;
+  packageType: PackageType | null;
   itemDescription: string;
   weightKg: number;
   noOfPackages: number;
   courierMode: CourierMode;
-  declaredValue: number | null;
-  freightCharges: number;
-  totalCharges: number;
-  paymentMode: PaymentMode;
   specialInstructions: string | null;
   status: BookingStatus;
+  awbNumber: string | null;
   approverUsername: string | null;
   approvalTimestamp: string | null;
   approvalRemarks: string | null;
+  createdAt: string | null;
+  createdBy: string | null;
 }
 
 export interface PartyBreakdown {

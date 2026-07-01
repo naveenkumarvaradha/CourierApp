@@ -1,9 +1,10 @@
 package com.courierapp.dto.booking;
 
+import com.courierapp.dto.admin.CourierWayResponse;
+import com.courierapp.dto.admin.PackageTypeResponse;
 import com.courierapp.dto.master.PartyResponse;
 import com.courierapp.enums.BookingStatus;
 import com.courierapp.enums.CourierMode;
-import com.courierapp.enums.PaymentMode;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -15,22 +16,23 @@ public record BookingResponse(
         LocalDate bookingDate,
         PartyResponse sender,
         PartyResponse receiver,
+        CourierWayResponse courierWay,
+        PackageTypeResponse packageType,
         String itemDescription,
         BigDecimal weightKg,
         Integer noOfPackages,
         CourierMode courierMode,
-        BigDecimal declaredValue,
-        BigDecimal freightCharges,
-        BigDecimal totalCharges,
-        PaymentMode paymentMode,
         String specialInstructions,
         BookingStatus status,
+        String awbNumber,
         String approverUsername,
         Instant approvalTimestamp,
         String approvalRemarks,
+        String companyPoNo,
+        boolean printTaken,
+        String cancellationRemarks,
         Instant createdAt,
         String createdBy,
         Instant updatedAt,
         String updatedBy
-) {
-}
+) {}

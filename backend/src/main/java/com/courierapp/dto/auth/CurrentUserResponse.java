@@ -8,7 +8,9 @@ public record CurrentUserResponse(
         String username,
         String fullName,
         String email,
+        Long companyId,
+        String companyCode,
+        String companyName,
         List<String> roles,
         Set<String> permissions
-) {
-}
+) {}

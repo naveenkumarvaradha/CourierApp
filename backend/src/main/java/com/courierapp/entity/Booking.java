@@ -53,14 +53,14 @@ public class Booking extends Auditable {
     @Column(name = "declared_value", precision = 14, scale = 2)
     private BigDecimal declaredValue;
 
-    @Column(name = "freight_charges", nullable = false, precision = 14, scale = 2)
+    @Column(name = "freight_charges", precision = 14, scale = 2)
     private BigDecimal freightCharges;
 
-    @Column(name = "total_charges", nullable = false, precision = 14, scale = 2)
+    @Column(name = "total_charges", precision = 14, scale = 2)
     private BigDecimal totalCharges;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "payment_mode", nullable = false, length = 20)
+    @Column(name = "payment_mode", length = 20)
     private PaymentMode paymentMode;
 
     @Column(name = "special_instructions", length = 1000)
@@ -70,6 +70,17 @@ public class Booking extends Auditable {
     @Column(name = "status", nullable = false, length = 30)
     private BookingStatus status;
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "courier_way_id")
+    private CourierWay courierWay;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "package_type_id")
+    private PackageType packageType;
+
+    @Column(name = "awb_number", unique = true, length = 60)
+    private String awbNumber;
+
     @Column(name = "approver_username", length = 60)
     private String approverUsername;
 
@@ -78,4 +89,13 @@ public class Booking extends Auditable {
 
     @Column(name = "approval_remarks", length = 500)
     private String approvalRemarks;
+
+    @Column(name = "company_po_no", length = 100)
+    private String companyPoNo;
+
+    @Column(name = "print_taken", nullable = false)
+    private boolean printTaken = false;
+
+    @Column(name = "cancellation_remarks", length = 500)
+    private String cancellationRemarks;
 }

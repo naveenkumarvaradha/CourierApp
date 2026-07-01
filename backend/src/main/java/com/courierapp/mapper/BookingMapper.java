@@ -4,7 +4,7 @@ import com.courierapp.dto.booking.BookingResponse;
 import com.courierapp.entity.Booking;
 import org.mapstruct.Mapper;
 
-@Mapper(componentModel = "spring", uses = {PartyMapper.class})
+@Mapper(componentModel = "spring", uses = {PartyMapper.class, CourierWayMapper.class, PackageTypeMapper.class})
 public interface BookingMapper {
     BookingResponse toResponse(Booking booking);
 }

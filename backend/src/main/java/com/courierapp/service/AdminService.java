@@ -30,4 +30,36 @@ public interface AdminService {
     ApprovalRoutingResponse createApprovalRouting(ApprovalRoutingRequest request);
     ApprovalRoutingResponse updateApprovalRouting(Long id, ApprovalRoutingRequest request);
     void deleteApprovalRouting(Long id);
+
+    // Company settings
+    CompanySettingsResponse getCompanySettings();
+    CompanySettingsResponse updateCompanySettings(CompanySettingsRequest request);
+
+    // Courier ways
+    List<CourierWayResponse> listCourierWays();
+    List<CourierWayResponse> listActiveCourierWays();
+    CourierWayResponse createCourierWay(CourierWayRequest request);
+    CourierWayResponse updateCourierWay(Long id, CourierWayRequest request);
+    void deleteCourierWay(Long id);
+
+    // Departments
+    List<DepartmentResponse> listDepartments();
+    List<DepartmentResponse> listActiveDepartments();
+    DepartmentResponse createDepartment(DepartmentRequest request);
+    DepartmentResponse updateDepartment(Long id, DepartmentRequest request);
+    void deleteDepartment(Long id);
+
+    // Package types
+    List<PackageTypeResponse> listPackageTypes();
+    List<PackageTypeResponse> listActivePackageTypes();
+    PackageTypeResponse createPackageType(PackageTypeRequest request);
+    PackageTypeResponse updatePackageType(Long id, PackageTypeRequest request);
+    void deletePackageType(Long id);
+
+    // Companies
+    List<CompanyResponse> listCompanies();
+    List<CompanyResponse> listActiveCompanies();
+    CompanyResponse createCompany(CompanyRequest request);
+    CompanyResponse updateCompany(Long id, CompanyRequest request);
+    void deleteCompany(Long id);
 }

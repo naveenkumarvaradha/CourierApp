@@ -4,6 +4,7 @@ import com.courierapp.entity.ApprovalRouting;
 import com.courierapp.entity.User;
 import com.courierapp.repository.ApprovalRoutingRepository;
 import com.courierapp.repository.UserRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -11,6 +12,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class ApprovalAuthorizationService {
 
@@ -23,22 +25,31 @@ public class ApprovalAuthorizationService {
         this.userRepository = userRepository;
     }
 
-    /**
-     * Returns true if {@code approverUsername} is a designated approver for a booking
-     * that was created by {@code creatorUsername}.
-     *
-     * Routing rules that have a creatorRole set only fire when the booking creator
-     * holds that role. Rules with no creatorRole are catch-all and fire for any creator.
-     */
+    /** Convenience overload for booking approvals (module = BOOKING). */
     @Transactional(readOnly = true)
     public boolean isAuthorizedApprover(String approverUsername, String creatorUsername) {
+        return isAuthorizedApprover(approverUsername, creatorUsername, "BOOKING");
+    }
+
+    /**
+     * Returns true if {@code approverUsername} is a designated approver for the given module
+     * when the record was created by {@code creatorUsername}.
+     *
+     * Priority: creator-user rule > creator-role rule > catch-all.
+     */
+    @Transactional(readOnly = true)
+    public boolean isAuthorizedApprover(String approverUsername, String creatorUsername, String module) {
+        log.debug("Authorization check: approver={}, creator={}, module={}", approverUsername, creatorUsername, module);
+
         User approver = userRepository.findByUsername(approverUsername).orElse(null);
-        if (approver == null) return false;
+        if (approver == null) {
+            log.warn("Approver '{}' not found in system", approverUsername);
+            return false;
+        }
 
         Set<String> approverRoles = approver.getRoles().stream()
                 .map(r -> r.getName()).collect(Collectors.toSet());
 
-        // Determine creator's roles (needed to match creator_role_id rules)
         Set<String> creatorRoles = Set.of();
         if (creatorUsername != null) {
             User creator = userRepository.findByUsername(creatorUsername).orElse(null);
@@ -49,32 +60,36 @@ public class ApprovalAuthorizationService {
         }
         final Set<String> resolvedCreatorRoles = creatorRoles;
 
-        List<ApprovalRouting> activeRoutes = approvalRoutingRepository.findByActiveTrue();
+        List<ApprovalRouting> activeRoutes = approvalRoutingRepository.findByActiveTrue().stream()
+                .filter(r -> module.equalsIgnoreCase(r.getModule()))
+                .toList();
 
         for (ApprovalRouting routing : activeRoutes) {
-            // If scoped to a specific creator user, only apply when the creator matches exactly
             if (routing.getCreatorUser() != null) {
                 if (creatorUsername == null ||
                         !routing.getCreatorUser().getUsername().equalsIgnoreCase(creatorUsername)) {
                     continue;
                 }
             } else if (routing.getCreatorRole() != null) {
-                // If scoped to a creator role, only apply when the creator holds that role
                 if (!resolvedCreatorRoles.contains(routing.getCreatorRole().getName())) {
                     continue;
                 }
             }
 
-            // Check if the current approver matches this routing entry
             if (routing.getUser() != null
                     && routing.getUser().getUsername().equalsIgnoreCase(approverUsername)) {
+                log.debug("Authorized via user-specific rule id={}", routing.getId());
                 return true;
             }
             if (routing.getRole() != null
                     && approverRoles.contains(routing.getRole().getName())) {
+                log.debug("Authorized via role rule id={}, role={}", routing.getId(), routing.getRole().getName());
                 return true;
             }
         }
+
+        log.warn("Authorization DENIED: approver='{}' is not a designated approver for module={} created by '{}'",
+                approverUsername, module, creatorUsername);
         return false;
     }
 }

@@ -10,5 +10,6 @@ import java.util.Optional;
 
 public interface BookingRepository extends JpaRepository<Booking, Long>, JpaSpecificationExecutor<Booking> {
     Optional<Booking> findByBookingNumber(String bookingNumber);
+    Optional<Booking> findByAwbNumber(String awbNumber);
     List<Booking> findByBookingDateBetween(LocalDate from, LocalDate to);
 }

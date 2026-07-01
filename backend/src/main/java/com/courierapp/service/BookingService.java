@@ -2,6 +2,7 @@ package com.courierapp.service;
 
 import com.courierapp.dto.PageResponse;
 import com.courierapp.dto.booking.ApprovalDecisionRequest;
+import com.courierapp.dto.booking.AwbUpdateRequest;
 import com.courierapp.dto.booking.BookingRequest;
 import com.courierapp.dto.booking.BookingResponse;
 import com.courierapp.dto.booking.StatusUpdateRequest;
@@ -33,5 +34,19 @@ public interface BookingService {
 
     BookingResponse changeStatus(Long id, StatusUpdateRequest request);
 
+    BookingResponse updateAwb(Long id, AwbUpdateRequest request);
+
     byte[] generateStickerPdf(Long id);
+
+    /** Reset an APPROVED booking back to BOOKED for re-editing (only if no AWB and print not taken). */
+    BookingResponse revise(Long id);
+
+    /** Request cancellation for an APPROVED booking; routes through approval. */
+    BookingResponse requestCancellation(Long id, String remarks);
+
+    /** Approver confirms cancellation (PENDING_CANCELLATION → CANCELLED). */
+    BookingResponse approveCancellation(Long id, String approverUsername);
+
+    /** Approver rejects cancellation (PENDING_CANCELLATION → APPROVED). */
+    BookingResponse rejectCancellation(Long id, String approverUsername);
 }

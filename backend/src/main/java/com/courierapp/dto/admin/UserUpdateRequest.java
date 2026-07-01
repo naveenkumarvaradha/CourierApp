@@ -24,6 +24,10 @@ public record UserUpdateRequest(
 
         Set<Long> roleIds,
 
-        Set<Long> directPermissionIds
+        Set<Long> directPermissionIds,
+
+        Long departmentId,
+
+        Long companyId
 ) {
 }

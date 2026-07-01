@@ -7,5 +7,6 @@ public enum BookingStatus {
     IN_TRANSIT,
     DELIVERED,
     CANCELLED,
-    REJECTED
+    REJECTED,
+    PENDING_CANCELLATION
 }

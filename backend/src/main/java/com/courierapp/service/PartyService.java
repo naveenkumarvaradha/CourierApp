@@ -14,4 +14,6 @@ public interface PartyService {
     PartyResponse create(PartyRequest request);
     PartyResponse update(Long id, PartyRequest request);
     void delete(Long id);
+    PartyResponse approve(Long id, String approverUsername);
+    PartyResponse reject(Long id, String approverUsername, String remarks);
 }

@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Checkbox,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -16,17 +17,27 @@ import {
   Select,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
 import { partyApi } from '../../api/endpoints';
 import { extractErrorMessage } from '../../api/client';
 import { useNotification } from '../../context/NotificationContext';
 import { useAuth } from '../../context/AuthContext';
-import type { Party, PartyType } from '../../types';
+import type { Party, PartyStatus, PartyType } from '../../types';
+
+const STATUS_COLOR: Record<PartyStatus, 'default' | 'warning' | 'success' | 'error'> = {
+  PENDING_APPROVAL: 'warning',
+  ACTIVE: 'success',
+  INACTIVE: 'default',
+  REJECTED: 'error',
+};
 
 interface FormState {
   id?: number;
@@ -67,6 +78,10 @@ export default function PartiesPage() {
   const [filters, setFilters] = useState({ name: '', city: '', pincode: '' });
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY);
+
+  // Reject dialog
+  const [rejectDialog, setRejectDialog] = useState<{ id: number } | null>(null);
+  const [rejectRemarks, setRejectRemarks] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -116,7 +131,7 @@ export default function PartiesPage() {
         notify('Party updated', 'success');
       } else {
         await partyApi.create(body);
-        notify('Party created', 'success');
+        notify('Party submitted for approval', 'success');
       }
       setOpen(false);
       load();
@@ -136,38 +151,92 @@ export default function PartiesPage() {
     }
   };
 
+  const approve = async (id: number) => {
+    try {
+      await partyApi.approve(id);
+      notify('Party approved and is now ACTIVE', 'success');
+      load();
+    } catch (err) {
+      notify(extractErrorMessage(err), 'error');
+    }
+  };
+
+  const confirmReject = async () => {
+    if (!rejectDialog) return;
+    try {
+      await partyApi.reject(rejectDialog.id, rejectRemarks || undefined);
+      notify('Party rejected', 'success');
+      setRejectDialog(null);
+      setRejectRemarks('');
+      load();
+    } catch (err) {
+      notify(extractErrorMessage(err), 'error');
+    }
+  };
+
   const columns: GridColDef<Party>[] = [
     { field: 'partyCode', headerName: 'Code', width: 120 },
     { field: 'partyName', headerName: 'Name', flex: 1.2 },
     { field: 'city', headerName: 'City', flex: 0.8 },
     { field: 'state', headerName: 'State', flex: 0.8 },
     { field: 'pincode', headerName: 'Pincode', width: 110 },
-    { field: 'partyType', headerName: 'Type', width: 110 },
+    { field: 'partyType', headerName: 'Type', width: 100 },
     {
-      field: 'active',
-      headerName: 'Active',
-      width: 90,
-      valueGetter: (_v, row) => (row.active ? 'Yes' : 'No'),
+      field: 'partyStatus',
+      headerName: 'Status',
+      width: 160,
+      renderCell: (p) => {
+        const status: PartyStatus = p.row.partyStatus ?? (p.row.active ? 'ACTIVE' : 'INACTIVE');
+        return (
+          <Chip
+            size="small"
+            color={STATUS_COLOR[status]}
+            label={status.replace('_', ' ')}
+          />
+        );
+      },
     },
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 120,
+      width: 160,
       sortable: false,
-      renderCell: (params) => (
-        <>
-          {hasPermission('MASTER_UPDATE') && (
-            <IconButton size="small" onClick={() => openEdit(params.row)}>
-              <EditIcon fontSize="small" />
-            </IconButton>
-          )}
-          {hasPermission('MASTER_DELETE') && (
-            <IconButton size="small" color="error" onClick={() => remove(params.row.id)}>
-              <DeleteIcon fontSize="small" />
-            </IconButton>
-          )}
-        </>
-      ),
+      renderCell: (params) => {
+        const p = params.row;
+        const isPending = p.partyStatus === 'PENDING_APPROVAL';
+        return (
+          <Stack direction="row">
+            {hasPermission('MASTER_APPROVE') && isPending && (
+              <>
+                <Tooltip title="Approve party">
+                  <IconButton size="small" color="success" onClick={() => approve(p.id)}>
+                    <CheckIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Reject party">
+                  <IconButton size="small" color="error" onClick={() => { setRejectDialog({ id: p.id }); setRejectRemarks(''); }}>
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </>
+            )}
+            {hasPermission('MASTER_UPDATE') && (
+              <Tooltip title="Edit">
+                <IconButton size="small" onClick={() => openEdit(p)}>
+                  <EditIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            {hasPermission('MASTER_DELETE') && (
+              <Tooltip title="Delete">
+                <IconButton size="small" color="error" onClick={() => remove(p.id)}>
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Stack>
+        );
+      },
     },
   ];
 
@@ -216,9 +285,15 @@ export default function PartiesPage() {
         />
       </Box>
 
+      {/* Create / Edit dialog */}
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>{form.id ? 'Edit Party' : 'New Party'}</DialogTitle>
         <DialogContent>
+          {!form.id && (
+            <Typography variant="body2" color="warning.main" sx={{ mb: 1 }}>
+              New parties require approval before they become active.
+            </Typography>
+          )}
           <Grid container spacing={2} mt={0}>
             <Grid item xs={12} sm={6}>
               <TextField
@@ -336,7 +411,29 @@ export default function PartiesPage() {
         <DialogActions>
           <Button onClick={() => setOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={save}>
-            Save
+            {form.id ? 'Save' : 'Submit for Approval'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Reject dialog */}
+      <Dialog open={!!rejectDialog} onClose={() => setRejectDialog(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>Reject Party</DialogTitle>
+        <DialogContent>
+          <TextField
+            label="Remarks (optional)"
+            fullWidth
+            multiline
+            minRows={3}
+            sx={{ mt: 1 }}
+            value={rejectRemarks}
+            onChange={(e) => setRejectRemarks(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRejectDialog(null)}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={confirmReject}>
+            Reject
           </Button>
         </DialogActions>
       </Dialog>

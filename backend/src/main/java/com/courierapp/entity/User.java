@@ -44,6 +44,14 @@ public class User extends Auditable {
             inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<Role> roles = new HashSet<>();
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "department_id")
+    private Department department;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "company_id")
+    private Company company;
+
     /** Direct per-user permission grants in addition to those from roles. */
     @Builder.Default
     @ManyToMany(fetch = FetchType.EAGER)

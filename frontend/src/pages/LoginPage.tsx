@@ -1,34 +1,40 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  CircularProgress,
-  Stack,
-  TextField,
-  Typography,
+  Alert, Box, Button, Card, CardContent, CircularProgress,
+  Link, MenuItem, Stack, TextField, Typography,
 } from '@mui/material';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import { useAuth } from '../context/AuthContext';
+import { authApi } from '../api/endpoints';
 import { extractErrorMessage } from '../api/client';
+import type { Company } from '../types';
 
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [username, setUsername] = useState('admin');
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [companyCode, setCompanyCode] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    authApi.listCompanies()
+      .then((list) => {
+        setCompanies(list);
+        if (list.length === 1) setCompanyCode(list[0].companyCode);
+      })
+      .catch(() => {});
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      await login(username, password);
+      await login(companyCode, username, password);
       navigate('/', { replace: true });
     } catch (err) {
       setError(extractErrorMessage(err));
@@ -48,27 +54,36 @@ export default function LoginPage() {
         p: 2,
       }}
     >
-      <Card sx={{ width: 400, maxWidth: '100%' }} elevation={8}>
+      <Card sx={{ width: 420, maxWidth: '100%' }} elevation={8}>
         <CardContent sx={{ p: 4 }}>
           <Stack alignItems="center" spacing={1} mb={3}>
             <LocalShippingIcon sx={{ fontSize: 48, color: 'primary.main' }} />
-            <Typography variant="h5" fontWeight={700}>
-              Courier Booking System
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Sign in to continue
-            </Typography>
+            <Typography variant="h5" fontWeight={700}>Courier Booking System</Typography>
+            <Typography variant="body2" color="text.secondary">Sign in to continue</Typography>
           </Stack>
           <form onSubmit={submit}>
             <Stack spacing={2}>
               {error && <Alert severity="error">{error}</Alert>}
+              <TextField
+                select
+                label="Company"
+                value={companyCode}
+                onChange={(e) => setCompanyCode(e.target.value)}
+                fullWidth
+                required
+                disabled={companies.length === 0}
+              >
+                {companies.map((c) => (
+                  <MenuItem key={c.id} value={c.companyCode}>{c.name}</MenuItem>
+                ))}
+              </TextField>
               <TextField
                 label="Username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 fullWidth
                 required
-                autoFocus
+                autoComplete="username"
               />
               <TextField
                 label="Password"
@@ -77,6 +92,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 fullWidth
                 required
+                autoComplete="current-password"
               />
               <Button
                 type="submit"
@@ -87,6 +103,11 @@ export default function LoginPage() {
               >
                 {loading ? 'Signing in...' : 'Sign In'}
               </Button>
+              <Box textAlign="right">
+                <Link component={RouterLink} to="/forgot-password" variant="body2">
+                  Forgot Password?
+                </Link>
+              </Box>
             </Stack>
           </form>
         </CardContent>
