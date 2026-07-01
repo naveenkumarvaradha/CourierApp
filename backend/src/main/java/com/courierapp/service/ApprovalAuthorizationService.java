@@ -52,10 +52,16 @@ public class ApprovalAuthorizationService {
         List<ApprovalRouting> activeRoutes = approvalRoutingRepository.findByActiveTrue();
 
         for (ApprovalRouting routing : activeRoutes) {
-            // If this rule is scoped to a creator role, only apply it when the creator has that role
-            if (routing.getCreatorRole() != null) {
+            // If scoped to a specific creator user, only apply when the creator matches exactly
+            if (routing.getCreatorUser() != null) {
+                if (creatorUsername == null ||
+                        !routing.getCreatorUser().getUsername().equalsIgnoreCase(creatorUsername)) {
+                    continue;
+                }
+            } else if (routing.getCreatorRole() != null) {
+                // If scoped to a creator role, only apply when the creator holds that role
                 if (!resolvedCreatorRoles.contains(routing.getCreatorRole().getName())) {
-                    continue; // rule doesn't apply to this booking's creator
+                    continue;
                 }
             }
 

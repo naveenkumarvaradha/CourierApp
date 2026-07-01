@@ -24,6 +24,9 @@ import { useNotification } from '../../context/NotificationContext';
 import { useAuth } from '../../context/AuthContext';
 import type { ApprovalRouting, Role, UserAccount } from '../../types';
 
+type CreatorKind = 'ANY' | 'ROLE' | 'USER';
+type ApproverKind = 'ROLE' | 'USER';
+
 export default function ApprovalRoutingPage() {
   const { notify } = useNotification();
   const { hasPermission } = useAuth();
@@ -32,11 +35,15 @@ export default function ApprovalRoutingPage() {
   const [users, setUsers] = useState<UserAccount[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [target, setTarget] = useState<{ kind: 'ROLE' | 'USER'; id: number | '' }>({
-    kind: 'ROLE',
-    id: '',
-  });
+
+  // Creator scope
+  const [creatorKind, setCreatorKind] = useState<CreatorKind>('ANY');
   const [creatorRoleId, setCreatorRoleId] = useState<number | ''>('');
+  const [creatorUserId, setCreatorUserId] = useState<number | ''>('');
+
+  // Approver
+  const [approverKind, setApproverKind] = useState<ApproverKind>('ROLE');
+  const [approverId, setApproverId] = useState<number | ''>('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,22 +65,38 @@ export default function ApprovalRoutingPage() {
     load();
   }, [load]);
 
+  const resetForm = () => {
+    setCreatorKind('ANY');
+    setCreatorRoleId('');
+    setCreatorUserId('');
+    setApproverKind('ROLE');
+    setApproverId('');
+  };
+
   const save = async () => {
-    if (target.id === '') {
+    if (approverId === '') {
       notify('Select a role or user to be the approver', 'warning');
+      return;
+    }
+    if (creatorKind === 'ROLE' && creatorRoleId === '') {
+      notify('Select a creator role', 'warning');
+      return;
+    }
+    if (creatorKind === 'USER' && creatorUserId === '') {
+      notify('Select a creator user', 'warning');
       return;
     }
     try {
       await adminApi.createApprovalRouting({
-        roleId: target.kind === 'ROLE' ? Number(target.id) : null,
-        userId: target.kind === 'USER' ? Number(target.id) : null,
-        creatorRoleId: creatorRoleId !== '' ? Number(creatorRoleId) : null,
+        roleId: approverKind === 'ROLE' ? Number(approverId) : null,
+        userId: approverKind === 'USER' ? Number(approverId) : null,
+        creatorRoleId: creatorKind === 'ROLE' ? Number(creatorRoleId) : null,
+        creatorUserId: creatorKind === 'USER' ? Number(creatorUserId) : null,
         active: true,
       });
-      notify('Approval routing added', 'success');
+      notify('Approval routing rule added', 'success');
       setOpen(false);
-      setTarget({ kind: 'ROLE', id: '' });
-      setCreatorRoleId('');
+      resetForm();
       load();
     } catch (err) {
       notify(extractErrorMessage(err), 'error');
@@ -93,47 +116,48 @@ export default function ApprovalRoutingPage() {
 
   const columns: GridColDef<ApprovalRouting>[] = [
     {
-      field: 'creatorRoleName',
-      headerName: 'Booking Created By (Role)',
+      field: 'creator',
+      headerName: 'Booking Created By',
       flex: 1,
-      renderCell: (p) =>
-        p.row.creatorRoleName ? (
-          <Chip size="small" label={p.row.creatorRoleName} color="info" variant="outlined" />
-        ) : (
-          <Typography variant="caption" color="text.secondary">
-            Any
-          </Typography>
-        ),
+      renderCell: (p) => {
+        const label = p.row.creatorUsername ?? p.row.creatorRoleName;
+        const kind = p.row.creatorUsername ? 'User' : p.row.creatorRoleName ? 'Role' : null;
+        if (!label) {
+          return <Typography variant="caption" color="text.secondary">Any</Typography>;
+        }
+        return (
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            <Typography variant="caption" color="text.secondary">{kind}:</Typography>
+            <Chip size="small" label={label} color="info" variant="outlined" />
+          </Stack>
+        );
+      },
     },
     {
-      field: 'type',
-      headerName: 'Approver Type',
-      width: 120,
-      valueGetter: (_v, row) => (row.roleName ? 'Role' : 'User'),
-    },
-    {
-      field: 'target',
+      field: 'approver',
       headerName: 'Designated Approver',
       flex: 1,
-      renderCell: (p) => (
-        <Chip
-          size="small"
-          label={p.row.roleName ?? p.row.username}
-          color="success"
-          variant="outlined"
-        />
-      ),
+      renderCell: (p) => {
+        const label = p.row.username ?? p.row.roleName;
+        const kind = p.row.username ? 'User' : 'Role';
+        return (
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            <Typography variant="caption" color="text.secondary">{kind}:</Typography>
+            <Chip size="small" label={label} color="success" variant="outlined" />
+          </Stack>
+        );
+      },
     },
     {
       field: 'active',
       headerName: 'Active',
-      width: 100,
+      width: 90,
       valueGetter: (_v, row) => (row.active ? 'Yes' : 'No'),
     },
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 100,
+      width: 90,
       sortable: false,
       renderCell: (params) =>
         hasPermission('ADMIN_DELETE') ? (
@@ -158,9 +182,8 @@ export default function ApprovalRoutingPage() {
       </Stack>
 
       <Typography variant="body2" color="text.secondary">
-        Each rule maps: "when a booking is created by someone with [Creator Role], it must be
-        approved by [Designated Approver role/user]". Leave Creator Role blank to apply the rule
-        to all bookings regardless of who created them.
+        Each rule maps: "when a booking is created by [specific user / role / anyone], it must be
+        approved by [designated approver]". Specific-user rules take priority over role rules.
       </Typography>
 
       <Box sx={{ height: 480, bgcolor: 'background.paper' }}>
@@ -174,55 +197,93 @@ export default function ApprovalRoutingPage() {
         />
       </Box>
 
-      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={open} onClose={() => { setOpen(false); resetForm(); }} maxWidth="sm" fullWidth>
         <DialogTitle>Add Approval Routing Rule</DialogTitle>
         <DialogContent>
           <Stack spacing={2} mt={1}>
-            <FormControl fullWidth>
-              <InputLabel>Creator Role (bookings created by…)</InputLabel>
+            {/* ── Creator scope ── */}
+            <Typography variant="subtitle2" color="text.secondary">
+              When booking is created by…
+            </Typography>
+
+            <FormControl fullWidth size="small">
+              <InputLabel>Creator scope</InputLabel>
               <Select
-                label="Creator Role (bookings created by…)"
-                value={creatorRoleId}
-                onChange={(e) => setCreatorRoleId(e.target.value as number | '')}
+                label="Creator scope"
+                value={creatorKind}
+                onChange={(e) => {
+                  setCreatorKind(e.target.value as CreatorKind);
+                  setCreatorRoleId('');
+                  setCreatorUserId('');
+                }}
               >
-                <MenuItem value="">
-                  <em>Any role (catch-all)</em>
-                </MenuItem>
-                {roles.map((r) => (
-                  <MenuItem key={r.id} value={r.id}>
-                    {r.name}
-                  </MenuItem>
-                ))}
+                <MenuItem value="ANY">Anyone (catch-all)</MenuItem>
+                <MenuItem value="ROLE">Specific Role</MenuItem>
+                <MenuItem value="USER">Specific User</MenuItem>
               </Select>
             </FormControl>
 
-            <FormControl fullWidth>
+            {creatorKind === 'ROLE' && (
+              <FormControl fullWidth size="small">
+                <InputLabel>Creator Role</InputLabel>
+                <Select
+                  label="Creator Role"
+                  value={creatorRoleId}
+                  onChange={(e) => setCreatorRoleId(e.target.value as number)}
+                >
+                  {roles.map((r) => (
+                    <MenuItem key={r.id} value={r.id}>{r.name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+
+            {creatorKind === 'USER' && (
+              <FormControl fullWidth size="small">
+                <InputLabel>Creator User</InputLabel>
+                <Select
+                  label="Creator User"
+                  value={creatorUserId}
+                  onChange={(e) => setCreatorUserId(e.target.value as number)}
+                >
+                  {users.map((u) => (
+                    <MenuItem key={u.id} value={u.id}>
+                      {u.username} — {u.fullName}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+
+            {/* ── Approver ── */}
+            <Typography variant="subtitle2" color="text.secondary" sx={{ pt: 1 }}>
+              …must be approved by…
+            </Typography>
+
+            <FormControl fullWidth size="small">
               <InputLabel>Designate approver by</InputLabel>
               <Select
                 label="Designate approver by"
-                value={target.kind}
-                onChange={(e) =>
-                  setTarget({ kind: e.target.value as 'ROLE' | 'USER', id: '' })
-                }
+                value={approverKind}
+                onChange={(e) => {
+                  setApproverKind(e.target.value as ApproverKind);
+                  setApproverId('');
+                }}
               >
                 <MenuItem value="ROLE">Role</MenuItem>
                 <MenuItem value="USER">Specific User</MenuItem>
               </Select>
             </FormControl>
 
-            <FormControl fullWidth>
-              <InputLabel>{target.kind === 'ROLE' ? 'Approver Role' : 'Approver User'}</InputLabel>
+            <FormControl fullWidth size="small">
+              <InputLabel>{approverKind === 'ROLE' ? 'Approver Role' : 'Approver User'}</InputLabel>
               <Select
-                label={target.kind === 'ROLE' ? 'Approver Role' : 'Approver User'}
-                value={target.id}
-                onChange={(e) => setTarget({ ...target, id: e.target.value as number })}
+                label={approverKind === 'ROLE' ? 'Approver Role' : 'Approver User'}
+                value={approverId}
+                onChange={(e) => setApproverId(e.target.value as number)}
               >
-                {target.kind === 'ROLE'
-                  ? roles.map((r) => (
-                      <MenuItem key={r.id} value={r.id}>
-                        {r.name}
-                      </MenuItem>
-                    ))
+                {approverKind === 'ROLE'
+                  ? roles.map((r) => <MenuItem key={r.id} value={r.id}>{r.name}</MenuItem>)
                   : users.map((u) => (
                       <MenuItem key={u.id} value={u.id}>
                         {u.username} — {u.fullName}
@@ -233,18 +294,8 @@ export default function ApprovalRoutingPage() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button
-            onClick={() => {
-              setOpen(false);
-              setTarget({ kind: 'ROLE', id: '' });
-              setCreatorRoleId('');
-            }}
-          >
-            Cancel
-          </Button>
-          <Button variant="contained" onClick={save}>
-            Add
-          </Button>
+          <Button onClick={() => { setOpen(false); resetForm(); }}>Cancel</Button>
+          <Button variant="contained" onClick={save}>Add</Button>
         </DialogActions>
       </Dialog>
     </Stack>

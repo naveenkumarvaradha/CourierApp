@@ -27,7 +27,11 @@
       "Bash(ls \"/c/Program Files/Java\" 2>/dev/null; ls \"/c/Program Files/Eclipse Adoptium\" 2>/dev/null; ls \"/c/\" | grep -iE \"jdk|java\" 2>/dev/null; echo \"---\"; ls \"/c/Program Files/Microsoft\" 2>/dev/null | grep -i jdk)",
       "Bash(mvn -q -DskipTests package)",
       "Bash(npm install *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(gh pr create --title 'feat: creator-based approval routing for courier bookings' --body ' *)"
     ]
   }
 }

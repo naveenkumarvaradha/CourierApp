@@ -4,6 +4,7 @@ public record ApprovalRoutingRequest(
         Long roleId,
         Long userId,
         Long creatorRoleId,
+        Long creatorUserId,
         boolean active
 ) {
 }
