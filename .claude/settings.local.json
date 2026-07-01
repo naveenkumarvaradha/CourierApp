@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la)",
+      "Bash(dir)",
+      "Bash(cat > *)",
+      "Bash(python3 -c \"import bcrypt; print\\(bcrypt.hashpw\\(b'Admin@123', bcrypt.gensalt\\(rounds=10\\)\\).decode\\(\\)\\)\")",
+      "Bash(pip install *)",
+      "Bash(ls backend/src/main/resources/db/migration)",
+      "Bash(find frontend *)",
+      "Bash(mvn -q dependency:get -Dartifact=org.springframework.security:spring-security-crypto:6.3.3)",
+      "Bash(rm -f \"D:\\\\Application\\\\CourierApp\\\\backend\\\\src\\\\main\\\\java\\\\com\\\\courierapp\\\\tool\\\\HashGen.java\")",
+      "Bash(rmdir \"D:\\\\Application\\\\CourierApp\\\\backend\\\\src\\\\main\\\\java\\\\com\\\\courierapp\\\\tool\")",
+      "Bash(mvn -v)",
+      "Bash(timeout 30 curl -sI https://repo.maven.apache.org/maven2/)",
+      "Bash(timeout 20 mvn -q compile)",
+      "Bash(mvn -q -DskipTests compile)",
+      "Bash(mvn -q compile)",
+      "Bash(echo \"EXIT:$?\")",
+      "Read(//c/Program Files/Java/**)",
+      "Read(//c/Program Files/**)",
+      "Read(//c//**)",
+      "Bash(curl -s https://search.maven.org/solrsearch/select?q=g:org.projectlombok+AND+a:lombok)",
+      "Bash(mvn -q -DskipTests clean package)",
+      "Bash(mvn -q dependency:tree -Dincludes=org.projectlombok)",
+      "Bash(curl -s \"https://repo1.maven.org/maven2/org/projectlombok/lombok/maven-metadata.xml\")",
+      "Bash(ls \"/c/Program Files/Java\" 2>/dev/null; ls \"/c/Program Files/Eclipse Adoptium\" 2>/dev/null; ls \"/c/\" | grep -iE \"jdk|java\" 2>/dev/null; echo \"---\"; ls \"/c/Program Files/Microsoft\" 2>/dev/null | grep -i jdk)",
+      "Bash(mvn -q -DskipTests package)",
+      "Bash(npm install *)",
+      "Bash(npm run *)"
+    ]
+  }
+}

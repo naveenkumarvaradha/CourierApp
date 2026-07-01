@@ -1,0 +1,56 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: courier-booking-backend
+  datasource:
+    url: jdbc:postgresql://localhost:5432/courierdb
+    username: ${DB_USERNAME:courier_app}
+    password: ${DB_PASSWORD:Courier@123}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          time_zone: UTC
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:CHANGE_THIS_TO_A_LONG_RANDOM_SECRET_IN_PRODUCTION_ENV_VAR}
+    access-token-expiry-minutes: 30
+    refresh-token-expiry-days: 7
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:5173}
+  booking:
+    number-prefix: CB
+  pagination:
+    default-page-size: 20
+    max-page-size: 200
+
+logging:
+  level:
+    com.courierapp: INFO
+    org.springframework.security: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
