@@ -25,6 +25,11 @@ public class ApprovalRouting extends Auditable {
     @JoinColumn(name = "user_id")
     private User user;
 
+    /** When set, this rule only applies to bookings created by users who have this role. */
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "creator_role_id")
+    private Role creatorRole;
+
     @Column(name = "active", nullable = false)
     private boolean active;
 }

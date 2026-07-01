@@ -66,6 +66,8 @@ export interface ApprovalRouting {
   roleName: string | null;
   userId: number | null;
   username: string | null;
+  creatorRoleId: number | null;
+  creatorRoleName: string | null;
   active: boolean;
 }
 

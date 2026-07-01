@@ -7,13 +7,10 @@ import com.courierapp.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * Determines whether a given user is authorized to approve bookings, based on the
- * admin-configured approval routing (designated approver roles/users).
- */
 @Service
 public class ApprovalAuthorizationService {
 
@@ -26,22 +23,49 @@ public class ApprovalAuthorizationService {
         this.userRepository = userRepository;
     }
 
+    /**
+     * Returns true if {@code approverUsername} is a designated approver for a booking
+     * that was created by {@code creatorUsername}.
+     *
+     * Routing rules that have a creatorRole set only fire when the booking creator
+     * holds that role. Rules with no creatorRole are catch-all and fire for any creator.
+     */
     @Transactional(readOnly = true)
-    public boolean isAuthorizedApprover(String username) {
-        User user = userRepository.findByUsername(username).orElse(null);
-        if (user == null) {
-            return false;
-        }
-        Set<String> userRoleNames = user.getRoles().stream()
+    public boolean isAuthorizedApprover(String approverUsername, String creatorUsername) {
+        User approver = userRepository.findByUsername(approverUsername).orElse(null);
+        if (approver == null) return false;
+
+        Set<String> approverRoles = approver.getRoles().stream()
                 .map(r -> r.getName()).collect(Collectors.toSet());
 
-        for (ApprovalRouting routing : approvalRoutingRepository.findByActiveTrue()) {
+        // Determine creator's roles (needed to match creator_role_id rules)
+        Set<String> creatorRoles = Set.of();
+        if (creatorUsername != null) {
+            User creator = userRepository.findByUsername(creatorUsername).orElse(null);
+            if (creator != null) {
+                creatorRoles = creator.getRoles().stream()
+                        .map(r -> r.getName()).collect(Collectors.toSet());
+            }
+        }
+        final Set<String> resolvedCreatorRoles = creatorRoles;
+
+        List<ApprovalRouting> activeRoutes = approvalRoutingRepository.findByActiveTrue();
+
+        for (ApprovalRouting routing : activeRoutes) {
+            // If this rule is scoped to a creator role, only apply it when the creator has that role
+            if (routing.getCreatorRole() != null) {
+                if (!resolvedCreatorRoles.contains(routing.getCreatorRole().getName())) {
+                    continue; // rule doesn't apply to this booking's creator
+                }
+            }
+
+            // Check if the current approver matches this routing entry
             if (routing.getUser() != null
-                    && routing.getUser().getUsername().equalsIgnoreCase(username)) {
+                    && routing.getUser().getUsername().equalsIgnoreCase(approverUsername)) {
                 return true;
             }
             if (routing.getRole() != null
-                    && userRoleNames.contains(routing.getRole().getName())) {
+                    && approverRoles.contains(routing.getRole().getName())) {
                 return true;
             }
         }

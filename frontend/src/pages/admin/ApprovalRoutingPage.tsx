@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   Box,
   Button,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -35,6 +36,7 @@ export default function ApprovalRoutingPage() {
     kind: 'ROLE',
     id: '',
   });
+  const [creatorRoleId, setCreatorRoleId] = useState<number | ''>('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,18 +60,20 @@ export default function ApprovalRoutingPage() {
 
   const save = async () => {
     if (target.id === '') {
-      notify('Select a role or user', 'warning');
+      notify('Select a role or user to be the approver', 'warning');
       return;
     }
     try {
       await adminApi.createApprovalRouting({
         roleId: target.kind === 'ROLE' ? Number(target.id) : null,
         userId: target.kind === 'USER' ? Number(target.id) : null,
+        creatorRoleId: creatorRoleId !== '' ? Number(creatorRoleId) : null,
         active: true,
       });
       notify('Approval routing added', 'success');
       setOpen(false);
       setTarget({ kind: 'ROLE', id: '' });
+      setCreatorRoleId('');
       load();
     } catch (err) {
       notify(extractErrorMessage(err), 'error');
@@ -89,8 +93,21 @@ export default function ApprovalRoutingPage() {
 
   const columns: GridColDef<ApprovalRouting>[] = [
     {
+      field: 'creatorRoleName',
+      headerName: 'Booking Created By (Role)',
+      flex: 1,
+      renderCell: (p) =>
+        p.row.creatorRoleName ? (
+          <Chip size="small" label={p.row.creatorRoleName} color="info" variant="outlined" />
+        ) : (
+          <Typography variant="caption" color="text.secondary">
+            Any
+          </Typography>
+        ),
+    },
+    {
       field: 'type',
-      headerName: 'Type',
+      headerName: 'Approver Type',
       width: 120,
       valueGetter: (_v, row) => (row.roleName ? 'Role' : 'User'),
     },
@@ -98,7 +115,14 @@ export default function ApprovalRoutingPage() {
       field: 'target',
       headerName: 'Designated Approver',
       flex: 1,
-      valueGetter: (_v, row) => row.roleName ?? row.username,
+      renderCell: (p) => (
+        <Chip
+          size="small"
+          label={p.row.roleName ?? p.row.username}
+          color="success"
+          variant="outlined"
+        />
+      ),
     },
     {
       field: 'active',
@@ -128,14 +152,15 @@ export default function ApprovalRoutingPage() {
         </Typography>
         {hasPermission('ADMIN_CREATE') && (
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOpen(true)}>
-            Add Approver
+            Add Rule
           </Button>
         )}
       </Stack>
 
       <Typography variant="body2" color="text.secondary">
-        Users matching these roles, or named directly here, are authorized to approve or reject
-        courier bookings.
+        Each rule maps: "when a booking is created by someone with [Creator Role], it must be
+        approved by [Designated Approver role/user]". Leave Creator Role blank to apply the rule
+        to all bookings regardless of who created them.
       </Typography>
 
       <Box sx={{ height: 480, bgcolor: 'background.paper' }}>
@@ -150,13 +175,31 @@ export default function ApprovalRoutingPage() {
       </Box>
 
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Add Designated Approver</DialogTitle>
+        <DialogTitle>Add Approval Routing Rule</DialogTitle>
         <DialogContent>
           <Stack spacing={2} mt={1}>
             <FormControl fullWidth>
-              <InputLabel>Designate by</InputLabel>
+              <InputLabel>Creator Role (bookings created by…)</InputLabel>
               <Select
-                label="Designate by"
+                label="Creator Role (bookings created by…)"
+                value={creatorRoleId}
+                onChange={(e) => setCreatorRoleId(e.target.value as number | '')}
+              >
+                <MenuItem value="">
+                  <em>Any role (catch-all)</em>
+                </MenuItem>
+                {roles.map((r) => (
+                  <MenuItem key={r.id} value={r.id}>
+                    {r.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel>Designate approver by</InputLabel>
+              <Select
+                label="Designate approver by"
                 value={target.kind}
                 onChange={(e) =>
                   setTarget({ kind: e.target.value as 'ROLE' | 'USER', id: '' })
@@ -166,10 +209,11 @@ export default function ApprovalRoutingPage() {
                 <MenuItem value="USER">Specific User</MenuItem>
               </Select>
             </FormControl>
+
             <FormControl fullWidth>
-              <InputLabel>{target.kind === 'ROLE' ? 'Role' : 'User'}</InputLabel>
+              <InputLabel>{target.kind === 'ROLE' ? 'Approver Role' : 'Approver User'}</InputLabel>
               <Select
-                label={target.kind === 'ROLE' ? 'Role' : 'User'}
+                label={target.kind === 'ROLE' ? 'Approver Role' : 'Approver User'}
                 value={target.id}
                 onChange={(e) => setTarget({ ...target, id: e.target.value as number })}
               >
@@ -181,7 +225,7 @@ export default function ApprovalRoutingPage() {
                     ))
                   : users.map((u) => (
                       <MenuItem key={u.id} value={u.id}>
-                        {u.username} - {u.fullName}
+                        {u.username} — {u.fullName}
                       </MenuItem>
                     ))}
               </Select>
@@ -189,7 +233,15 @@ export default function ApprovalRoutingPage() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)}>Cancel</Button>
+          <Button
+            onClick={() => {
+              setOpen(false);
+              setTarget({ kind: 'ROLE', id: '' });
+              setCreatorRoleId('');
+            }}
+          >
+            Cancel
+          </Button>
           <Button variant="contained" onClick={save}>
             Add
           </Button>

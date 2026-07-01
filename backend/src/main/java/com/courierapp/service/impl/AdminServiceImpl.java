@@ -233,6 +233,7 @@ public class AdminServiceImpl implements AdminService {
             routing.setUser(findUser(request.userId()));
             routing.setRole(null);
         }
+        routing.setCreatorRole(request.creatorRoleId() != null ? findRole(request.creatorRoleId()) : null);
         routing.setActive(request.active());
     }
 
@@ -298,6 +299,8 @@ public class AdminServiceImpl implements AdminService {
                 r.getRole() != null ? r.getRole().getName() : null,
                 r.getUser() != null ? r.getUser().getId() : null,
                 r.getUser() != null ? r.getUser().getUsername() : null,
+                r.getCreatorRole() != null ? r.getCreatorRole().getId() : null,
+                r.getCreatorRole() != null ? r.getCreatorRole().getName() : null,
                 r.isActive());
     }
 }

@@ -42,7 +42,7 @@ export const adminApi = {
   deleteUser: (id: number) => api.delete(`/admin/users/${id}`),
 
   listApprovalRouting: () => api.get<ApprovalRouting[]>('/admin/approval-routing').then((r) => r.data),
-  createApprovalRouting: (body: { roleId: number | null; userId: number | null; active: boolean }) =>
+  createApprovalRouting: (body: { roleId: number | null; userId: number | null; creatorRoleId: number | null; active: boolean }) =>
     api.post<ApprovalRouting>('/admin/approval-routing', body).then((r) => r.data),
   deleteApprovalRouting: (id: number) => api.delete(`/admin/approval-routing/${id}`),
 };

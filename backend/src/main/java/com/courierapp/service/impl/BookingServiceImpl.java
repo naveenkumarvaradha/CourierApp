@@ -162,14 +162,15 @@ public class BookingServiceImpl implements BookingService {
     }
 
     private Booking requirePendingApproval(Long id, String approverUsername) {
-        if (!approvalAuthorizationService.isAuthorizedApprover(approverUsername)) {
-            throw new BusinessException(
-                    "You are not a designated approver for courier bookings",
-                    org.springframework.http.HttpStatus.FORBIDDEN);
-        }
         Booking booking = findBooking(id);
         if (booking.getStatus() != BookingStatus.PENDING_APPROVAL) {
             throw new BusinessException("Only bookings in PENDING_APPROVAL state can be approved or rejected");
+        }
+        String creator = booking.getCreatedBy();
+        if (!approvalAuthorizationService.isAuthorizedApprover(approverUsername, creator)) {
+            throw new BusinessException(
+                    "You are not a designated approver for this booking",
+                    org.springframework.http.HttpStatus.FORBIDDEN);
         }
         return booking;
     }

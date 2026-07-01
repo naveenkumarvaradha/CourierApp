@@ -6,6 +6,8 @@ public record ApprovalRoutingResponse(
         String roleName,
         Long userId,
         String username,
+        Long creatorRoleId,
+        String creatorRoleName,
         boolean active
 ) {
 }
