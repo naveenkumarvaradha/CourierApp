@@ -128,7 +128,7 @@ app:
     access-token-expiry-minutes: 15
     refresh-token-expiry-days: 7
   cors:
-    allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://tkllt031:5173,http://192.168.*:5173,http://10.*.*.*:5173,http://172.*.*.*:5173}
+    allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://tkllt031:5173,http://TKL-SRV-COURIER:5173,http://tkl-srv-courier:5173,http://192.168.*:5173,http://10.*.*.*:5173,http://172.*.*.*:5173}
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
   name: Courier Booking
   booking:
