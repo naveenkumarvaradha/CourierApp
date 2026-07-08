@@ -16,7 +16,8 @@ public interface BookingService {
 
     PageResponse<BookingResponse> search(String bookingNumber, LocalDate fromDate, LocalDate toDate,
                                          BookingStatus status, Long senderId, Long receiverId,
-                                         CourierMode mode, Pageable pageable);
+                                         CourierMode mode, String receiverName, String receiverCompanyName,
+                                         Pageable pageable);
 
     BookingResponse get(Long id);
 
@@ -49,4 +50,7 @@ public interface BookingService {
 
     /** Approver rejects cancellation (PENDING_CANCELLATION → APPROVED). */
     BookingResponse rejectCancellation(Long id, String approverUsername);
+
+    /** Returns true if the given username is the creator of booking with the given id. Used in @PreAuthorize. */
+    boolean isCreatorOf(Long id, String username);
 }

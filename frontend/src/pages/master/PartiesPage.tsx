@@ -26,11 +26,14 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import { partyApi } from '../../api/endpoints';
 import { extractErrorMessage } from '../../api/client';
 import { useNotification } from '../../context/NotificationContext';
 import { useAuth } from '../../context/AuthContext';
+import { useColumnVisibility } from '../../hooks/useColumnVisibility';
 import type { Party, PartyStatus, PartyType } from '../../types';
+import { GridToolbarColumnsButton, GridToolbarContainer } from '@mui/x-data-grid';
 
 const STATUS_COLOR: Record<PartyStatus, 'default' | 'warning' | 'success' | 'error'> = {
   PENDING_APPROVAL: 'warning',
@@ -53,6 +56,7 @@ interface FormState {
   gstin: string;
   partyType: PartyType;
   active: boolean;
+  companyName: string;
 }
 
 const EMPTY: FormState = {
@@ -68,16 +72,29 @@ const EMPTY: FormState = {
   gstin: '',
   partyType: 'BOTH',
   active: true,
+  companyName: '',
 };
+
+function CustomToolbar() {
+  return (
+    <GridToolbarContainer>
+      <GridToolbarColumnsButton />
+    </GridToolbarContainer>
+  );
+}
 
 export default function PartiesPage() {
   const { notify } = useNotification();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const [rows, setRows] = useState<Party[]>([]);
   const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState({ name: '', city: '', pincode: '' });
+  const [filters, setFilters] = useState({ name: '', city: '', pincode: '', companyName: '' });
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY);
+  const [colVisibility, setColVisibility] = useColumnVisibility(user?.id, 'parties');
+
+  // View dialog
+  const [viewParty, setViewParty] = useState<Party | null>(null);
 
   // Reject dialog
   const [rejectDialog, setRejectDialog] = useState<{ id: number } | null>(null);
@@ -86,8 +103,13 @@ export default function PartiesPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await partyApi.list({ ...filters, page: 0, size: 100 });
-      setRows(data.content);
+      const { companyName, ...apiFilters } = filters;
+      const data = await partyApi.list({ ...apiFilters, page: 0, size: 200 });
+      const filtered = companyName.trim() !== ''
+        ? data.content.filter((p) =>
+            (p.companyName ?? '').toLowerCase().includes(companyName.toLowerCase()))
+        : data.content;
+      setRows(filtered);
     } catch (err) {
       notify(extractErrorMessage(err), 'error');
     } finally {
@@ -119,13 +141,15 @@ export default function PartiesPage() {
       gstin: p.gstin ?? '',
       partyType: p.partyType,
       active: p.active,
+      companyName: p.companyName ?? '',
     });
     setOpen(true);
   };
 
   const save = async () => {
     try {
-      const { id, ...body } = form;
+      const { id, companyName, ...rest } = form;
+      const body = { ...rest, companyName: companyName.trim() !== '' ? companyName : null };
       if (id) {
         await partyApi.update(id, body);
         notify('Party updated', 'success');
@@ -177,10 +201,22 @@ export default function PartiesPage() {
   const columns: GridColDef<Party>[] = [
     { field: 'partyCode', headerName: 'Code', width: 120 },
     { field: 'partyName', headerName: 'Name', flex: 1.2 },
+    { field: 'companyName', headerName: 'Company', flex: 1, valueGetter: (_v, row) => row.companyName ?? '—' },
     { field: 'city', headerName: 'City', flex: 0.8 },
     { field: 'state', headerName: 'State', flex: 0.8 },
     { field: 'pincode', headerName: 'Pincode', width: 110 },
     { field: 'partyType', headerName: 'Type', width: 100 },
+    { field: 'createdBy', headerName: 'Created By', width: 110, valueGetter: (_v, row) => row.createdBy ?? '—' },
+    { field: 'createdAt', headerName: 'Created At', width: 150, valueGetter: (_v, row) => row.createdAt ? new Date(row.createdAt).toLocaleString() : '—' },
+    {
+      field: 'pendingApprovers',
+      headerName: 'Pending With',
+      width: 180,
+      valueGetter: (_v, row) =>
+        row.partyStatus === 'PENDING_APPROVAL' && row.pendingApprovers?.length
+          ? row.pendingApprovers.join(', ')
+          : '—',
+    },
     {
       field: 'partyStatus',
       headerName: 'Status',
@@ -199,13 +235,19 @@ export default function PartiesPage() {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 160,
+      width: 190,
       sortable: false,
       renderCell: (params) => {
         const p = params.row;
         const isPending = p.partyStatus === 'PENDING_APPROVAL';
         return (
           <Stack direction="row">
+            {/* View */}
+            <Tooltip title="View details">
+              <IconButton size="small" onClick={() => setViewParty(p)}>
+                <VisibilityIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
             {hasPermission('MASTER_APPROVE') && isPending && (
               <>
                 <Tooltip title="Approve party">
@@ -253,25 +295,15 @@ export default function PartiesPage() {
         )}
       </Stack>
 
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-        <TextField
-          size="small"
-          label="Name"
-          value={filters.name}
-          onChange={(e) => setFilters({ ...filters, name: e.target.value })}
-        />
-        <TextField
-          size="small"
-          label="City"
-          value={filters.city}
-          onChange={(e) => setFilters({ ...filters, city: e.target.value })}
-        />
-        <TextField
-          size="small"
-          label="Pincode"
-          value={filters.pincode}
-          onChange={(e) => setFilters({ ...filters, pincode: e.target.value })}
-        />
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} flexWrap="wrap" useFlexGap>
+        <TextField size="small" label="Name" value={filters.name}
+          onChange={(e) => setFilters({ ...filters, name: e.target.value })} />
+        <TextField size="small" label="City" value={filters.city}
+          onChange={(e) => setFilters({ ...filters, city: e.target.value })} />
+        <TextField size="small" label="Pincode" value={filters.pincode}
+          onChange={(e) => setFilters({ ...filters, pincode: e.target.value })} />
+        <TextField size="small" label="Company" value={filters.companyName}
+          onChange={(e) => setFilters({ ...filters, companyName: e.target.value })} />
       </Stack>
 
       <Box sx={{ height: 560, bgcolor: 'background.paper' }}>
@@ -282,6 +314,9 @@ export default function PartiesPage() {
           disableRowSelectionOnClick
           pageSizeOptions={[10, 25, 50]}
           initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+          columnVisibilityModel={colVisibility}
+          onColumnVisibilityModelChange={setColVisibility}
+          slots={{ toolbar: CustomToolbar }}
         />
       </Box>
 
@@ -320,6 +355,16 @@ export default function PartiesPage() {
             </Grid>
             <Grid item xs={12}>
               <TextField
+                label="Company"
+                fullWidth
+                placeholder="e.g. ABC Corporation"
+                value={form.companyName}
+                onChange={(e) => setForm({ ...form, companyName: e.target.value })}
+                helperText="The company / organisation this party belongs to (optional)"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
                 label="Address Line 1"
                 fullWidth
                 required
@@ -327,14 +372,7 @@ export default function PartiesPage() {
                 onChange={(e) => setForm({ ...form, addressLine1: e.target.value })}
               />
             </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Address Line 2"
-                fullWidth
-                value={form.addressLine2}
-                onChange={(e) => setForm({ ...form, addressLine2: e.target.value })}
-              />
-            </Grid>
+
             <Grid item xs={12} sm={4}>
               <TextField
                 label="City"
@@ -413,6 +451,71 @@ export default function PartiesPage() {
           <Button variant="contained" onClick={save}>
             {form.id ? 'Save' : 'Submit for Approval'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* View party dialog */}
+      <Dialog open={!!viewParty} onClose={() => setViewParty(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>Party Details — {viewParty?.partyCode}</DialogTitle>
+        <DialogContent>
+          {viewParty && (
+            <Grid container spacing={2} mt={0}>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="caption" color="text.secondary">Party Name</Typography>
+                <Typography>{viewParty.partyName}</Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="caption" color="text.secondary">Type</Typography>
+                <Typography>{viewParty.partyType}</Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="caption" color="text.secondary">Company</Typography>
+                <Typography>{viewParty.companyName ?? '—'}</Typography>
+              </Grid>
+              <Grid item xs={12}>
+                <Typography variant="caption" color="text.secondary">Address Line 1</Typography>
+                <Typography>{viewParty.addressLine1}</Typography>
+              </Grid>
+
+              <Grid item xs={6} sm={4}>
+                <Typography variant="caption" color="text.secondary">City</Typography>
+                <Typography>{viewParty.city}</Typography>
+              </Grid>
+              <Grid item xs={6} sm={4}>
+                <Typography variant="caption" color="text.secondary">State</Typography>
+                <Typography>{viewParty.state}</Typography>
+              </Grid>
+              <Grid item xs={6} sm={4}>
+                <Typography variant="caption" color="text.secondary">Pincode</Typography>
+                <Typography>{viewParty.pincode}</Typography>
+              </Grid>
+              <Grid item xs={6} sm={4}>
+                <Typography variant="caption" color="text.secondary">Country</Typography>
+                <Typography>{viewParty.country}</Typography>
+              </Grid>
+              <Grid item xs={6} sm={4}>
+                <Typography variant="caption" color="text.secondary">Phone</Typography>
+                <Typography>{viewParty.phone ?? '—'}</Typography>
+              </Grid>
+              <Grid item xs={6} sm={4}>
+                <Typography variant="caption" color="text.secondary">Email</Typography>
+                <Typography>{viewParty.email ?? '—'}</Typography>
+              </Grid>
+              <Grid item xs={6} sm={6}>
+                <Typography variant="caption" color="text.secondary">GSTIN</Typography>
+                <Typography>{viewParty.gstin ?? '—'}</Typography>
+              </Grid>
+              <Grid item xs={6} sm={6}>
+                <Typography variant="caption" color="text.secondary">Status</Typography>
+                <Chip size="small"
+                  color={STATUS_COLOR[viewParty.partyStatus ?? (viewParty.active ? 'ACTIVE' : 'INACTIVE')]}
+                  label={(viewParty.partyStatus ?? (viewParty.active ? 'ACTIVE' : 'INACTIVE')).replace('_', ' ')} />
+              </Grid>
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setViewParty(null)}>Close</Button>
         </DialogActions>
       </Dialog>
 

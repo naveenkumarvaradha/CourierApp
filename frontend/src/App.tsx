@@ -7,15 +7,23 @@ import DashboardPage from './pages/DashboardPage';
 import UsersPage from './pages/admin/UsersPage';
 import RolesPage from './pages/admin/RolesPage';
 import ApprovalRoutingPage from './pages/admin/ApprovalRoutingPage';
-import CompanySettingsPage from './pages/admin/CompanySettingsPage';
 import CourierWaysPage from './pages/admin/CourierWaysPage';
 import PackageTypesPage from './pages/admin/PackageTypesPage';
 import FlexFieldsPage from './pages/admin/FlexFieldsPage';
 import DepartmentsPage from './pages/admin/DepartmentsPage';
 import AuditLogsPage from './pages/admin/AuditLogsPage';
 import CompaniesPage from './pages/admin/CompaniesPage';
+import ReportSchedulesPage from './pages/admin/ReportSchedulesPage';
+import PasswordPolicyPage from './pages/admin/PasswordPolicyPage';
+import StickerConfigPage from './pages/admin/StickerConfigPage';
+import MailConfigPage from './pages/admin/MailConfigPage';
+import SystemStatusPage from './pages/admin/SystemStatusPage';
+import ApprovalCenterPage from './pages/ApprovalCenterPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
+import MfaConfirmPage from './pages/auth/MfaConfirmPage';
+import MfaSetupPage from './pages/auth/MfaSetupPage';
+import MfaAdminPage from './pages/admin/MfaAdminPage';
 import PartiesPage from './pages/master/PartiesPage';
 import BookingsPage from './pages/booking/BookingsPage';
 import BookingFormPage from './pages/booking/BookingFormPage';
@@ -48,6 +56,7 @@ export default function App() {
     return (
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/mfa-confirm" element={<MfaConfirmPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
@@ -60,6 +69,7 @@ export default function App() {
       <Route path="/login" element={<Navigate to="/" replace />} />
       <Route path="/" element={<Layout />}>
         <Route index element={<DashboardPage />} />
+        <Route path="approval-center" element={<ApprovalCenterPage />} />
 
         <Route
           path="admin/users"
@@ -85,14 +95,7 @@ export default function App() {
             </RequirePermission>
           }
         />
-        <Route
-          path="admin/company-settings"
-          element={
-            <RequirePermission codes={['ADMIN_VIEW']}>
-              <CompanySettingsPage />
-            </RequirePermission>
-          }
-        />
+        <Route path="admin/company-settings" element={<Navigate to="/admin/companies" replace />} />
         <Route
           path="admin/courier-ways"
           element={
@@ -142,6 +145,46 @@ export default function App() {
             </RequirePermission>
           }
         />
+        <Route
+          path="admin/report-schedules"
+          element={
+            <RequirePermission codes={['ADMIN_VIEW']}>
+              <ReportSchedulesPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="admin/password-policy"
+          element={
+            <RequirePermission codes={['ADMIN_VIEW']}>
+              <PasswordPolicyPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="admin/sticker-config"
+          element={
+            <RequirePermission codes={['ADMIN_VIEW']}>
+              <StickerConfigPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="admin/mail-config"
+          element={
+            <RequirePermission codes={['ADMIN_VIEW']}>
+              <MailConfigPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="admin/system-status"
+          element={
+            <RequirePermission codes={['ADMIN_VIEW']}>
+              <SystemStatusPage />
+            </RequirePermission>
+          }
+        />
 
         <Route
           path="master/parties"
@@ -186,6 +229,15 @@ export default function App() {
           }
         />
 
+        <Route path="profile/mfa" element={<MfaSetupPage />} />
+        <Route
+          path="admin/mfa-management"
+          element={
+            <RequirePermission codes={['ADMIN_VIEW']}>
+              <MfaAdminPage />
+            </RequirePermission>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

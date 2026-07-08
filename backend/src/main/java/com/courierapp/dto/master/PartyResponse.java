@@ -4,6 +4,7 @@ import com.courierapp.enums.PartyStatus;
 import com.courierapp.enums.PartyType;
 
 import java.time.Instant;
+import java.util.List;
 
 public record PartyResponse(
         Long id,
@@ -21,9 +22,12 @@ public record PartyResponse(
         PartyType partyType,
         boolean active,
         PartyStatus partyStatus,
+        String companyName,
+        int currentApprovalLevel,
         Instant createdAt,
         String createdBy,
         Instant updatedAt,
-        String updatedBy
+        String updatedBy,
+        List<String> pendingApprovers
 ) {
 }

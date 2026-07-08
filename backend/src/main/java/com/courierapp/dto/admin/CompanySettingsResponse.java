@@ -11,5 +11,12 @@ public record CompanySettingsResponse(
         String country,
         String phone,
         String email,
-        String gstin
+        String gstin,
+        // SMTP mail config (password is never returned)
+        String smtpHost,
+        Integer smtpPort,
+        String smtpUsername,
+        String smtpFromName,
+        Boolean smtpTls,
+        boolean smtpConfigured
 ) {}

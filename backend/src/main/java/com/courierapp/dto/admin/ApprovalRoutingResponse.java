@@ -11,6 +11,7 @@ public record ApprovalRoutingResponse(
         Long creatorUserId,
         String creatorUsername,
         boolean active,
-        String module
+        String module,
+        int level
 ) {
 }

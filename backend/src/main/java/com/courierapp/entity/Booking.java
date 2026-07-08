@@ -98,4 +98,7 @@ public class Booking extends Auditable {
 
     @Column(name = "cancellation_remarks", length = 500)
     private String cancellationRemarks;
+
+    @Column(name = "current_approval_level", nullable = false)
+    private int currentApprovalLevel = 1;
 }

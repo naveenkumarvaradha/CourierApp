@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Box,
   Button,
@@ -19,40 +19,30 @@ import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { adminApi } from '../../api/endpoints';
 import { extractErrorMessage } from '../../api/client';
 import { useNotification } from '../../context/NotificationContext';
 import { useAuth } from '../../context/AuthContext';
+import {
+  useListCourierWaysQuery,
+  useCreateCourierWayMutation,
+  useUpdateCourierWayMutation,
+  useDeleteCourierWayMutation,
+} from '../../store/api/adminApiSlice';
 import type { CourierWay } from '../../types';
 
-interface FormState {
-  id?: number;
-  name: string;
-  active: boolean;
-}
-
+interface FormState { id?: number; name: string; active: boolean }
 const EMPTY: FormState = { name: '', active: true };
 
 export default function CourierWaysPage() {
   const { notify } = useNotification();
   const { hasPermission } = useAuth();
-  const [rows, setRows] = useState<CourierWay[]>([]);
-  const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      setRows(await adminApi.listCourierWays());
-    } catch (err) {
-      notify(extractErrorMessage(err), 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [notify]);
-
-  useEffect(() => { load(); }, [load]);
+  const { data: rows = [], isFetching: loading } = useListCourierWaysQuery();
+  const [createCourierWay] = useCreateCourierWayMutation();
+  const [updateCourierWay] = useUpdateCourierWayMutation();
+  const [deleteCourierWay] = useDeleteCourierWayMutation();
 
   const openCreate = () => { setForm(EMPTY); setOpen(true); };
   const openEdit = (cw: CourierWay) => { setForm({ id: cw.id, name: cw.name, active: cw.active }); setOpen(true); };
@@ -61,14 +51,13 @@ export default function CourierWaysPage() {
     if (!form.name.trim()) { notify('Name is required', 'warning'); return; }
     try {
       if (form.id) {
-        await adminApi.updateCourierWay(form.id, { name: form.name.trim(), active: form.active });
+        await updateCourierWay({ id: form.id, name: form.name.trim(), active: form.active }).unwrap();
         notify('Courier way updated', 'success');
       } else {
-        await adminApi.createCourierWay({ name: form.name.trim(), active: form.active });
+        await createCourierWay({ name: form.name.trim(), active: form.active }).unwrap();
         notify('Courier way added', 'success');
       }
       setOpen(false);
-      load();
     } catch (err) {
       notify(extractErrorMessage(err), 'error');
     }
@@ -77,9 +66,8 @@ export default function CourierWaysPage() {
   const remove = async (id: number) => {
     if (!window.confirm('Delete this courier way? Existing bookings using it will not be affected.')) return;
     try {
-      await adminApi.deleteCourierWay(id);
+      await deleteCourierWay(id).unwrap();
       notify('Deleted', 'success');
-      load();
     } catch (err) {
       notify(extractErrorMessage(err), 'error');
     }

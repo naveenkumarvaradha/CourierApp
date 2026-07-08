@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -18,18 +18,33 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridToolbarColumnsButton, GridToolbarContainer } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import PrintIcon from '@mui/icons-material/Print';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import SendIcon from '@mui/icons-material/Send';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import EditNoteIcon from '@mui/icons-material/EditNote';
+import CancelIcon from '@mui/icons-material/Cancel';
 import { bookingApi } from '../../api/endpoints';
-import { extractErrorMessage } from '../../api/client';
+import { extractErrorMessage, extractBlobError } from '../../api/client';
+import {
+  useSearchBookingsQuery,
+  useSubmitBookingMutation,
+  useApproveBookingMutation,
+  useRejectBookingMutation,
+  useUpdateAwbMutation,
+  useReviseBookingMutation,
+  useRequestCancellationMutation,
+  useApproveCancellationMutation,
+  useRejectCancellationMutation,
+} from '../../store/api/bookingApiSlice';
 import { useNotification } from '../../context/NotificationContext';
 import { useAuth } from '../../context/AuthContext';
+import { useColumnVisibility } from '../../hooks/useColumnVisibility';
 import type { Booking, BookingStatus } from '../../types';
 
 const STATUS_COLORS: Record<BookingStatus, 'default' | 'info' | 'warning' | 'success' | 'error'> = {
@@ -40,56 +55,77 @@ const STATUS_COLORS: Record<BookingStatus, 'default' | 'info' | 'warning' | 'suc
   DELIVERED: 'success',
   CANCELLED: 'default',
   REJECTED: 'error',
+  PENDING_CANCELLATION: 'warning',
 };
 
 const PRINTABLE_STATUSES: BookingStatus[] = ['APPROVED', 'IN_TRANSIT', 'DELIVERED'];
 
+function CustomToolbar() {
+  return (
+    <GridToolbarContainer>
+      <GridToolbarColumnsButton />
+    </GridToolbarContainer>
+  );
+}
+
 export default function BookingsPage() {
   const { notify } = useNotification();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const navigate = useNavigate();
-  const [rows, setRows] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
     bookingNumber: '',
+    receiverName: '',
+    receiverCompanyName: '',
     fromDate: '',
     toDate: '',
     status: '',
     mode: '',
   });
 
+  const [colVisibility, setColVisibility] = useColumnVisibility(user?.id, 'bookings');
+
+  // ── RTK Query ──────────────────────────────────────────────────────────────
+  const queryParams = {
+    page: 0, size: 100,
+    ...(filters.bookingNumber && { bookingNumber: filters.bookingNumber }),
+    ...(filters.receiverName && { receiverName: filters.receiverName }),
+    ...(filters.receiverCompanyName && { receiverCompanyName: filters.receiverCompanyName }),
+    ...(filters.fromDate && { fromDate: filters.fromDate }),
+    ...(filters.toDate && { toDate: filters.toDate }),
+    ...(filters.status && { status: filters.status }),
+    ...(filters.mode && { mode: filters.mode }),
+  };
+  const { data: bookingPage, isFetching: loading } = useSearchBookingsQuery(queryParams);
+  const rows: Booking[] = bookingPage?.content ?? [];
+
+  const [submitBooking]      = useSubmitBookingMutation();
+  const [approveBooking]     = useApproveBookingMutation();
+  const [rejectBooking]      = useRejectBookingMutation();
+  const [updateAwb]          = useUpdateAwbMutation();
+  const [reviseBooking]      = useReviseBookingMutation();
+  const [requestCancellation] = useRequestCancellationMutation();
+  const [approveCancellation] = useApproveCancellationMutation();
+  const [rejectCancellation]  = useRejectCancellationMutation();
+
   // Approve/Reject dialog
   const [decision, setDecision] = useState<{ id: number; action: 'approve' | 'reject' } | null>(null);
   const [remarks, setRemarks] = useState('');
 
   // AWB dialog
-  const [awbDialog, setAwbDialog] = useState<{ id: number; bookingNumber: string; current: string | null } | null>(null);
+  const [awbDialog, setAwbDialog] = useState<{ id: number; bookingNumber: string } | null>(null);
   const [awbInput, setAwbInput] = useState('');
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params: Record<string, unknown> = { page: 0, size: 100 };
-      Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v; });
-      const data = await bookingApi.search(params);
-      setRows(data.content);
-    } catch (err) {
-      notify(extractErrorMessage(err), 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [filters, notify]);
+  // Cancel request dialog
+  const [cancelDialog, setCancelDialog] = useState<{ id: number; bookingNumber: string } | null>(null);
+  const [cancelRemarks, setCancelRemarks] = useState('');
 
-  useEffect(() => { load(); }, [load]);
+  // Cancellation approval dialog
+  const [cancelApproval, setCancelApproval] = useState<{ id: number; action: 'approve' | 'reject' } | null>(null);
 
-  const printSticker = async (b: Booking) => {
-    if (!PRINTABLE_STATUSES.includes(b.status)) {
-      notify('Sticker can only be printed for APPROVED bookings', 'warning');
-      return;
-    }
+  const printSticker = useCallback(async (b: Booking) => {
     if (!b.awbNumber) {
-      notify('Set the AWB number before printing the sticker', 'warning');
-      setAwbDialog({ id: b.id, bookingNumber: b.bookingNumber, current: null });
+      notify('Set AWB number before printing', 'warning');
+      setAwbDialog({ id: b.id, bookingNumber: b.bookingNumber });
       return;
     }
     try {
@@ -98,142 +134,118 @@ export default function BookingsPage() {
       window.open(url, '_blank');
       setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch (err) {
-      notify(extractErrorMessage(err), 'error');
+      const msg = await extractBlobError(err);
+      notify(msg, 'error');
     }
-  };
+  }, [notify]);
 
-  const submit = async (id: number) => {
+  const submit = useCallback(async (id: number) => {
     try {
-      await bookingApi.submit(id);
+      await submitBooking(id).unwrap();
       notify('Submitted for approval', 'success');
-      load();
-    } catch (err) {
-      notify(extractErrorMessage(err), 'error');
-    }
-  };
+    } catch (err) { notify(extractErrorMessage(err), 'error'); }
+  }, [submitBooking, notify]);
+
+  const revise = useCallback(async (id: number) => {
+    try {
+      await reviseBooking(id).unwrap();
+      notify('Booking reset to BOOKED for revision', 'success');
+    } catch (err) { notify(extractErrorMessage(err), 'error'); }
+  }, [reviseBooking, notify]);
 
   const confirmDecision = async () => {
     if (!decision) return;
     try {
       if (decision.action === 'approve') {
-        await bookingApi.approve(decision.id, remarks);
+        await approveBooking({ id: decision.id, remarks }).unwrap();
         notify('Booking approved', 'success');
       } else {
-        await bookingApi.reject(decision.id, remarks);
+        await rejectBooking({ id: decision.id, remarks }).unwrap();
         notify('Booking rejected', 'success');
       }
-      setDecision(null);
-      setRemarks('');
-      load();
-    } catch (err) {
-      notify(extractErrorMessage(err), 'error');
-    }
+      setDecision(null); setRemarks('');
+    } catch (err) { notify(extractErrorMessage(err), 'error'); }
   };
 
   const saveAwb = async () => {
-    if (!awbDialog || !awbInput.trim()) {
-      notify('Enter AWB number', 'warning');
-      return;
-    }
+    if (!awbDialog || !awbInput.trim()) { notify('Enter AWB number', 'warning'); return; }
     try {
-      await bookingApi.updateAwb(awbDialog.id, awbInput.trim());
-      notify('AWB number saved', 'success');
-      setAwbDialog(null);
-      setAwbInput('');
-      load();
-    } catch (err) {
-      notify(extractErrorMessage(err), 'error');
-    }
+      await updateAwb({ id: awbDialog.id, awbNumber: awbInput.trim() }).unwrap();
+      notify('AWB saved', 'success');
+      setAwbDialog(null); setAwbInput('');
+    } catch (err) { notify(extractErrorMessage(err), 'error'); }
+  };
+
+  const submitCancelRequest = async () => {
+    if (!cancelDialog) return;
+    try {
+      await requestCancellation({ id: cancelDialog.id, remarks: cancelRemarks || undefined }).unwrap();
+      notify('Cancellation request submitted for approval', 'success');
+      setCancelDialog(null); setCancelRemarks('');
+    } catch (err) { notify(extractErrorMessage(err), 'error'); }
+  };
+
+  const confirmCancelApproval = async () => {
+    if (!cancelApproval) return;
+    try {
+      if (cancelApproval.action === 'approve') {
+        await approveCancellation(cancelApproval.id).unwrap();
+        notify('Cancellation approved — booking cancelled', 'success');
+      } else {
+        await rejectCancellation(cancelApproval.id).unwrap();
+        notify('Cancellation rejected — booking restored to APPROVED', 'success');
+      }
+      setCancelApproval(null);
+    } catch (err) { notify(extractErrorMessage(err), 'error'); }
   };
 
   const columns: GridColDef<Booking>[] = [
     { field: 'bookingNumber', headerName: 'Booking No', flex: 1.2 },
-    { field: 'bookingDate', headerName: 'Date', width: 110 },
+    { field: 'bookingDate', headerName: 'Date', width: 100 },
+    { field: 'receiver', headerName: 'Party Name', flex: 1, valueGetter: (_v, row) => row.receiver?.partyName },
+    { field: 'receiverCompany', headerName: 'Company', flex: 1, valueGetter: (_v, row) => row.receiver?.companyName ?? '—' },
+    { field: 'courierMode', headerName: 'Mode', width: 80 },
+    { field: 'courierWay', headerName: 'Via', width: 100, valueGetter: (_v, row) => row.courierWay?.name ?? '—' },
+    { field: 'createdBy', headerName: 'Created By', width: 110, valueGetter: (_v, row) => row.createdBy ?? '—' },
+    { field: 'createdAt', headerName: 'Created At', width: 150, valueGetter: (_v, row) => row.createdAt ? new Date(row.createdAt).toLocaleString() : '—' },
     {
-      field: 'sender',
-      headerName: 'Sender',
-      flex: 1,
-      valueGetter: (_v, row) => row.sender?.partyName,
+      field: 'awbNumber', headerName: 'AWB No', width: 140,
+      renderCell: (p) => p.row.awbNumber
+        ? <Chip size="small" label={p.row.awbNumber} color="primary" variant="outlined" />
+        : <Typography variant="caption" color="text.disabled">—</Typography>,
     },
     {
-      field: 'receiver',
-      headerName: 'Receiver',
-      flex: 1,
-      valueGetter: (_v, row) => row.receiver?.partyName,
-    },
-    { field: 'courierMode', headerName: 'Mode', width: 90 },
-    {
-      field: 'courierWay',
-      headerName: 'Via',
-      width: 100,
-      valueGetter: (_v, row) => row.courierWay?.name ?? '—',
-    },
-    {
-      field: 'awbNumber',
-      headerName: 'AWB No',
-      width: 140,
-      renderCell: (p) =>
-        p.row.awbNumber ? (
-          <Chip size="small" label={p.row.awbNumber} color="primary" variant="outlined" />
-        ) : (
-          <Typography variant="caption" color="text.disabled">—</Typography>
-        ),
-    },
-    {
-      field: 'status',
-      headerName: 'Status',
-      width: 150,
+      field: 'status', headerName: 'Status', width: 170,
       renderCell: (p) => (
-        <Chip size="small" color={STATUS_COLORS[p.row.status]} label={p.row.status.replace('_', ' ')} />
+        <Stack direction="row" spacing={0.5} alignItems="center">
+          <Chip size="small" color={STATUS_COLORS[p.row.status]} label={p.row.status.replace(/_/g, ' ')} />
+          {p.row.printTaken && <Chip size="small" label="Printed" color="success" variant="outlined" />}
+        </Stack>
       ),
     },
     {
-      field: 'actions',
-      headerName: 'Actions',
-      width: 230,
-      sortable: false,
+      field: 'actions', headerName: 'Actions', width: 260, sortable: false,
       renderCell: (params) => {
         const b = params.row;
         const canPrint = PRINTABLE_STATUSES.includes(b.status);
-        const needsAwb = canPrint && !b.awbNumber;
+        const hasAwb = !!b.awbNumber;
+        const canRevise = b.status === 'APPROVED' && !hasAwb && !b.printTaken;
+        const canRequestCancel = b.status === 'APPROVED' && !hasAwb;
+
         return (
-          <Stack direction="row">
-            {/* Set AWB — only for APPROVED+ without AWB */}
-            {hasPermission('BOOKING_UPDATE') && needsAwb && (
-              <Tooltip title="Set AWB number (required before print)">
-                <IconButton
-                  size="small"
-                  color="warning"
-                  onClick={() => {
-                    setAwbDialog({ id: b.id, bookingNumber: b.bookingNumber, current: b.awbNumber });
-                    setAwbInput('');
-                  }}
-                >
-                  <LocalShippingIcon fontSize="small" />
+          <Stack direction="row" flexWrap="wrap">
+            <Tooltip title="View details">
+              <IconButton size="small" onClick={() => navigate(`/bookings/${b.id}/edit?view=1`)}>
+                <VisibilityIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            {hasPermission('BOOKING_UPDATE') && (b.status === 'BOOKED' || b.status === 'PENDING_APPROVAL') && (
+              <Tooltip title="Edit">
+                <IconButton size="small" onClick={() => navigate(`/bookings/${b.id}/edit`)}>
+                  <EditIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
             )}
-
-            {/* Print sticker — only when APPROVED+ AND AWB set */}
-            {canPrint && b.awbNumber && (
-              <Tooltip title="Print sticker">
-                <IconButton size="small" onClick={() => printSticker(b)}>
-                  <PrintIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            )}
-
-            {/* Edit */}
-            {hasPermission('BOOKING_UPDATE') &&
-              (b.status === 'BOOKED' || b.status === 'PENDING_APPROVAL') && (
-                <Tooltip title="Edit">
-                  <IconButton size="small" onClick={() => navigate(`/bookings/${b.id}/edit`)}>
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              )}
-
-            {/* Submit for approval */}
             {hasPermission('BOOKING_UPDATE') && b.status === 'BOOKED' && (
               <Tooltip title="Submit for approval">
                 <IconButton size="small" color="primary" onClick={() => submit(b.id)}>
@@ -241,8 +253,6 @@ export default function BookingsPage() {
                 </IconButton>
               </Tooltip>
             )}
-
-            {/* Approve / Reject */}
             {hasPermission('BOOKING_APPROVE') && b.status === 'PENDING_APPROVAL' && (
               <>
                 <Tooltip title="Approve">
@@ -257,6 +267,50 @@ export default function BookingsPage() {
                 </Tooltip>
               </>
             )}
+            {(hasPermission('BOOKING_UPDATE') || b.createdBy === user?.username) && canPrint && !hasAwb && (
+              <Tooltip title="Set AWB number">
+                <IconButton size="small" color="warning"
+                  onClick={() => { setAwbDialog({ id: b.id, bookingNumber: b.bookingNumber }); setAwbInput(''); }}>
+                  <LocalShippingIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            {(hasPermission('BOOKING_PRINT') || b.createdBy === user?.username) && canPrint && hasAwb && (
+              <Tooltip title={b.printTaken ? 'Reprint sticker' : 'Print sticker'}>
+                <IconButton size="small" color={b.printTaken ? 'default' : 'primary'} onClick={() => printSticker(b)}>
+                  <PrintIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            {hasPermission('BOOKING_REVISE') && canRevise && (
+              <Tooltip title="Revise booking (reset to BOOKED)">
+                <IconButton size="small" color="warning" onClick={() => revise(b.id)}>
+                  <EditNoteIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            {hasPermission('BOOKING_UPDATE') && canRequestCancel && (
+              <Tooltip title="Request cancellation">
+                <IconButton size="small" color="error"
+                  onClick={() => { setCancelDialog({ id: b.id, bookingNumber: b.bookingNumber }); setCancelRemarks(''); }}>
+                  <CancelIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            {hasPermission('BOOKING_APPROVE') && b.status === 'PENDING_CANCELLATION' && (
+              <>
+                <Tooltip title="Approve cancellation">
+                  <IconButton size="small" color="error" onClick={() => setCancelApproval({ id: b.id, action: 'approve' })}>
+                    <CheckIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Reject cancellation">
+                  <IconButton size="small" color="success" onClick={() => setCancelApproval({ id: b.id, action: 'reject' })}>
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </>
+            )}
           </Stack>
         );
       },
@@ -266,7 +320,7 @@ export default function BookingsPage() {
   return (
     <Stack spacing={2}>
       <Stack direction="row" justifyContent="space-between" alignItems="center">
-        <Typography variant="h5" fontWeight={600}>Courier Bookings</Typography>
+        <Typography variant="h5" fontWeight={600}>Shipments</Typography>
         {hasPermission('BOOKING_CREATE') && (
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/bookings/new')}>
             New Booking
@@ -274,24 +328,29 @@ export default function BookingsPage() {
         )}
       </Stack>
 
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} flexWrap="wrap">
+      {/* Filters */}
+      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} flexWrap="wrap" useFlexGap>
         <TextField size="small" label="Booking No" value={filters.bookingNumber}
-          onChange={(e) => setFilters({ ...filters, bookingNumber: e.target.value })} />
+          onChange={(e) => setFilters({ ...filters, bookingNumber: e.target.value })} sx={{ minWidth: 150 }} />
+        <TextField size="small" label="Party Name" value={filters.receiverName}
+          onChange={(e) => setFilters({ ...filters, receiverName: e.target.value })} sx={{ minWidth: 150 }} />
+        <TextField size="small" label="Company" value={filters.receiverCompanyName}
+          onChange={(e) => setFilters({ ...filters, receiverCompanyName: e.target.value })} sx={{ minWidth: 160 }} />
         <TextField size="small" label="From" type="date" InputLabelProps={{ shrink: true }}
           value={filters.fromDate} onChange={(e) => setFilters({ ...filters, fromDate: e.target.value })} />
         <TextField size="small" label="To" type="date" InputLabelProps={{ shrink: true }}
           value={filters.toDate} onChange={(e) => setFilters({ ...filters, toDate: e.target.value })} />
-        <FormControl size="small" sx={{ minWidth: 150 }}>
+        <FormControl size="small" sx={{ minWidth: 170 }}>
           <InputLabel>Status</InputLabel>
           <Select label="Status" value={filters.status}
             onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
             <MenuItem value="">All</MenuItem>
-            {Object.keys(STATUS_COLORS).map((s) => (
-              <MenuItem key={s} value={s}>{s.replace('_', ' ')}</MenuItem>
+            {(Object.keys(STATUS_COLORS) as BookingStatus[]).map((s) => (
+              <MenuItem key={s} value={s}>{s.replace(/_/g, ' ')}</MenuItem>
             ))}
           </Select>
         </FormControl>
-        <FormControl size="small" sx={{ minWidth: 130 }}>
+        <FormControl size="small" sx={{ minWidth: 120 }}>
           <InputLabel>Mode</InputLabel>
           <Select label="Mode" value={filters.mode}
             onChange={(e) => setFilters({ ...filters, mode: e.target.value })}>
@@ -303,13 +362,21 @@ export default function BookingsPage() {
         </FormControl>
       </Stack>
 
-      <Box sx={{ height: 560, bgcolor: 'background.paper' }}>
-        <DataGrid rows={rows} columns={columns} loading={loading} disableRowSelectionOnClick
+      <Box sx={{ height: 580, bgcolor: 'background.paper' }}>
+        <DataGrid
+          rows={rows}
+          columns={columns}
+          loading={loading}
+          disableRowSelectionOnClick
           pageSizeOptions={[10, 25, 50]}
-          initialState={{ pagination: { paginationModel: { pageSize: 25 } } }} />
+          initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+          columnVisibilityModel={colVisibility}
+          onColumnVisibilityModelChange={setColVisibility}
+          slots={{ toolbar: CustomToolbar }}
+        />
       </Box>
 
-      {/* Approve / Reject dialog */}
+      {/* Approve / Reject booking */}
       <Dialog open={!!decision} onClose={() => setDecision(null)} maxWidth="sm" fullWidth>
         <DialogTitle>{decision?.action === 'approve' ? 'Approve Booking' : 'Reject Booking'}</DialogTitle>
         <DialogContent>
@@ -329,26 +396,55 @@ export default function BookingsPage() {
       <Dialog open={!!awbDialog} onClose={() => setAwbDialog(null)} maxWidth="xs" fullWidth>
         <DialogTitle>Set AWB Number</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          <Typography variant="body2" color="text.secondary" mb={2}>
             Booking: <strong>{awbDialog?.bookingNumber}</strong>
-            <br />
-            Enter the unique Air Waybill number. This will be printed on the shipping sticker.
           </Typography>
-          <TextField
-            label="AWB Number"
-            fullWidth
-            autoFocus
-            value={awbInput}
+          <TextField label="AWB Number" fullWidth autoFocus value={awbInput}
             onChange={(e) => setAwbInput(e.target.value.replace(/\D/g, ''))}
             inputProps={{ maxLength: 20, inputMode: 'numeric' }}
             onKeyDown={(e) => { if (e.key === 'Enter') saveAwb(); }}
-            helperText="Numbers only. Must be unique across all bookings."
-          />
+            helperText="Numbers only. Must be unique." />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setAwbDialog(null)}>Cancel</Button>
-          <Button variant="contained" color="primary" onClick={saveAwb} disabled={!awbInput.trim()}>
-            Save & Print
+          <Button variant="contained" onClick={saveAwb} disabled={!awbInput.trim()}>Save</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Cancel request dialog */}
+      <Dialog open={!!cancelDialog} onClose={() => setCancelDialog(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>Request Cancellation</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            Booking <strong>{cancelDialog?.bookingNumber}</strong> will be sent for cancellation approval.
+          </Typography>
+          <TextField label="Cancellation Reason" fullWidth multiline minRows={3}
+            value={cancelRemarks} onChange={(e) => setCancelRemarks(e.target.value)} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCancelDialog(null)}>Back</Button>
+          <Button variant="contained" color="error" onClick={submitCancelRequest}>Submit for Approval</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Cancellation approve/reject dialog */}
+      <Dialog open={!!cancelApproval} onClose={() => setCancelApproval(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>
+          {cancelApproval?.action === 'approve' ? 'Approve Cancellation' : 'Reject Cancellation'}
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            {cancelApproval?.action === 'approve'
+              ? 'Confirm to permanently cancel this booking.'
+              : 'Reject the cancellation request — booking will be restored to APPROVED.'}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCancelApproval(null)}>Back</Button>
+          <Button variant="contained"
+            color={cancelApproval?.action === 'approve' ? 'error' : 'success'}
+            onClick={confirmCancelApproval}>
+            {cancelApproval?.action === 'approve' ? 'Cancel Booking' : 'Reject & Restore'}
           </Button>
         </DialogActions>
       </Dialog>

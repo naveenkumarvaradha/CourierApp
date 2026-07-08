@@ -1,8 +1,13 @@
 package com.courierapp.controller;
 
 import com.courierapp.dto.PageResponse;
+import com.courierapp.dto.approval.ApprovalInfoResponse;
 import com.courierapp.dto.master.PartyRequest;
 import com.courierapp.dto.master.PartyResponse;
+import com.courierapp.entity.Party;
+import com.courierapp.exception.ResourceNotFoundException;
+import com.courierapp.repository.PartyRepository;
+import com.courierapp.service.ApprovalAuthorizationService;
 import com.courierapp.service.PartyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,9 +30,15 @@ import java.util.List;
 public class PartyController {
 
     private final PartyService partyService;
+    private final PartyRepository partyRepository;
+    private final ApprovalAuthorizationService approvalAuthorizationService;
 
-    public PartyController(PartyService partyService) {
+    public PartyController(PartyService partyService,
+                           PartyRepository partyRepository,
+                           ApprovalAuthorizationService approvalAuthorizationService) {
         this.partyService = partyService;
+        this.partyRepository = partyRepository;
+        this.approvalAuthorizationService = approvalAuthorizationService;
     }
 
     @GetMapping
@@ -57,6 +68,20 @@ public class PartyController {
         return partyService.get(id);
     }
 
+    @GetMapping("/{id}/approval-info")
+    @PreAuthorize("hasAuthority('MASTER_VIEW')")
+    public ApprovalInfoResponse approvalInfo(@PathVariable Long id) {
+        Party p = partyRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Party", id));
+        String creator = p.getCreatedBy();
+        int currentLevel = p.getCurrentApprovalLevel();
+        int maxLevel = approvalAuthorizationService.getMaxLevel(creator, "MASTER");
+        java.util.List<String> approvers = approvalAuthorizationService
+                .resolveApproversAtLevel(creator, "MASTER", currentLevel);
+        String summary = "Level " + currentLevel + " of " + maxLevel;
+        return new ApprovalInfoResponse(currentLevel, maxLevel, approvers, summary);
+    }
+
     @PostMapping
     @PreAuthorize("hasAuthority('MASTER_CREATE')")
     @ResponseStatus(HttpStatus.CREATED)
@@ -82,7 +107,7 @@ public class PartyController {
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("hasAuthority('MASTER_APPROVE')")
+    @PreAuthorize("hasAuthority('MASTER_APPROVE') or hasAuthority('ADMIN_VIEW')")
     @Operation(summary = "Approve a pending party (must be a designated master-data approver)")
     public PartyResponse approve(@PathVariable Long id, Authentication authentication) {
         log.info("POST /master/parties/{}/approve by user='{}'", id, authentication.getName());
@@ -90,7 +115,7 @@ public class PartyController {
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("hasAuthority('MASTER_APPROVE')")
+    @PreAuthorize("hasAuthority('MASTER_APPROVE') or hasAuthority('ADMIN_VIEW')")
     @Operation(summary = "Reject a pending party")
     public PartyResponse reject(@PathVariable Long id,
                                 @RequestParam(required = false) String remarks,

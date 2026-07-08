@@ -1,13 +1,17 @@
 package com.courierapp.controller;
 
 import com.courierapp.dto.PageResponse;
+import com.courierapp.dto.approval.ApprovalInfoResponse;
 import com.courierapp.dto.booking.ApprovalDecisionRequest;
 import com.courierapp.dto.booking.AwbUpdateRequest;
 import com.courierapp.dto.booking.BookingRequest;
 import com.courierapp.dto.booking.BookingResponse;
 import com.courierapp.dto.booking.StatusUpdateRequest;
+import com.courierapp.entity.Booking;
 import com.courierapp.enums.BookingStatus;
 import com.courierapp.enums.CourierMode;
+import com.courierapp.repository.BookingRepository;
+import com.courierapp.service.ApprovalAuthorizationService;
 import com.courierapp.service.BookingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -33,14 +37,19 @@ import java.time.LocalDate;
 public class BookingController {
 
     private final BookingService bookingService;
+    private final BookingRepository bookingRepository;
+    private final ApprovalAuthorizationService approvalAuthorizationService;
 
-    public BookingController(BookingService bookingService) {
+    public BookingController(BookingService bookingService,
+                             BookingRepository bookingRepository,
+                             ApprovalAuthorizationService approvalAuthorizationService) {
         this.bookingService = bookingService;
+        this.bookingRepository = bookingRepository;
+        this.approvalAuthorizationService = approvalAuthorizationService;
     }
 
     @GetMapping
     @PreAuthorize("hasAuthority('BOOKING_VIEW')")
-    @Operation(summary = "Search/list bookings with filters and pagination")
     public PageResponse<BookingResponse> search(
             @RequestParam(required = false) String bookingNumber,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
@@ -49,14 +58,31 @@ public class BookingController {
             @RequestParam(required = false) Long senderId,
             @RequestParam(required = false) Long receiverId,
             @RequestParam(required = false) CourierMode mode,
+            @RequestParam(required = false) String receiverName,
+            @RequestParam(required = false) String receiverCompanyName,
             @PageableDefault(size = 20, sort = "id") Pageable pageable) {
-        return bookingService.search(bookingNumber, fromDate, toDate, status, senderId, receiverId, mode, pageable);
+        return bookingService.search(bookingNumber, fromDate, toDate, status, senderId, receiverId,
+                mode, receiverName, receiverCompanyName, pageable);
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('BOOKING_VIEW')")
     public BookingResponse get(@PathVariable Long id) {
         return bookingService.get(id);
+    }
+
+    @GetMapping("/{id}/approval-info")
+    @PreAuthorize("hasAuthority('BOOKING_VIEW')")
+    public ApprovalInfoResponse approvalInfo(@PathVariable Long id) {
+        Booking b = bookingRepository.findById(id)
+                .orElseThrow(() -> new com.courierapp.exception.ResourceNotFoundException("Booking", id));
+        String creator = b.getCreatedBy();
+        int currentLevel = b.getCurrentApprovalLevel();
+        int maxLevel = approvalAuthorizationService.getMaxLevel(creator, "BOOKING");
+        java.util.List<String> approvers = approvalAuthorizationService
+                .resolveApproversAtLevel(creator, "BOOKING", currentLevel);
+        String summary = "Level " + currentLevel + " of " + maxLevel;
+        return new ApprovalInfoResponse(currentLevel, maxLevel, approvers, summary);
     }
 
     @PostMapping
@@ -81,14 +107,12 @@ public class BookingController {
 
     @PostMapping("/{id}/submit")
     @PreAuthorize("hasAuthority('BOOKING_UPDATE')")
-    @Operation(summary = "Submit a BOOKED booking for approval")
     public BookingResponse submit(@PathVariable Long id) {
         return bookingService.submitForApproval(id);
     }
 
     @PostMapping("/{id}/approve")
     @PreAuthorize("hasAuthority('BOOKING_APPROVE')")
-    @Operation(summary = "Approve a pending booking (must be a designated approver)")
     public BookingResponse approve(@PathVariable Long id,
                                    @Valid @RequestBody(required = false) ApprovalDecisionRequest request,
                                    Authentication authentication) {
@@ -97,7 +121,6 @@ public class BookingController {
 
     @PostMapping("/{id}/reject")
     @PreAuthorize("hasAuthority('BOOKING_APPROVE')")
-    @Operation(summary = "Reject a pending booking (must be a designated approver)")
     public BookingResponse reject(@PathVariable Long id,
                                   @Valid @RequestBody(required = false) ApprovalDecisionRequest request,
                                   Authentication authentication) {
@@ -106,28 +129,55 @@ public class BookingController {
 
     @PostMapping("/{id}/status")
     @PreAuthorize("hasAuthority('BOOKING_UPDATE')")
-    @Operation(summary = "Advance booking lifecycle status (IN_TRANSIT, DELIVERED, CANCELLED)")
     public BookingResponse changeStatus(@PathVariable Long id,
                                         @Valid @RequestBody StatusUpdateRequest request) {
         return bookingService.changeStatus(id, request);
     }
 
     @PutMapping("/{id}/awb")
-    @PreAuthorize("hasAuthority('BOOKING_UPDATE')")
-    @Operation(summary = "Set or update the AWB number on an APPROVED booking (required before sticker print)")
+    @PreAuthorize("hasAuthority('BOOKING_UPDATE') or hasAuthority('BOOKING_PRINT') or @bookingService.isCreatorOf(#id, authentication.name)")
     public BookingResponse updateAwb(@PathVariable Long id,
                                      @Valid @RequestBody AwbUpdateRequest request) {
         return bookingService.updateAwb(id, request);
     }
 
     @GetMapping(value = "/{id}/sticker", produces = MediaType.APPLICATION_PDF_VALUE)
-    @PreAuthorize("hasAuthority('BOOKING_VIEW')")
-    @Operation(summary = "Generate a printable 4x6 shipping label PDF with barcode")
+    @PreAuthorize("hasAuthority('BOOKING_PRINT') or @bookingService.isCreatorOf(#id, authentication.name)")
+    @Operation(summary = "Generate landscape 150×110mm shipping label PDF and mark print as taken")
     public ResponseEntity<byte[]> sticker(@PathVariable Long id) {
         byte[] pdf = bookingService.generateStickerPdf(id);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=sticker-" + id + ".pdf")
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(pdf);
+    }
+
+    @PostMapping("/{id}/revise")
+    @PreAuthorize("hasAuthority('BOOKING_REVISE')")
+    @Operation(summary = "Reset an APPROVED booking back to BOOKED for editing (only if no AWB and print not taken)")
+    public BookingResponse revise(@PathVariable Long id) {
+        return bookingService.revise(id);
+    }
+
+    @PostMapping("/{id}/request-cancellation")
+    @PreAuthorize("hasAuthority('BOOKING_UPDATE')")
+    @Operation(summary = "Request cancellation; routes through same approval flow as creation")
+    public BookingResponse requestCancellation(@PathVariable Long id,
+                                               @RequestParam(required = false) String remarks) {
+        return bookingService.requestCancellation(id, remarks);
+    }
+
+    @PostMapping("/{id}/approve-cancellation")
+    @PreAuthorize("hasAuthority('BOOKING_APPROVE')")
+    @Operation(summary = "Approver confirms cancellation (PENDING_CANCELLATION → CANCELLED)")
+    public BookingResponse approveCancellation(@PathVariable Long id, Authentication authentication) {
+        return bookingService.approveCancellation(id, authentication.getName());
+    }
+
+    @PostMapping("/{id}/reject-cancellation")
+    @PreAuthorize("hasAuthority('BOOKING_APPROVE')")
+    @Operation(summary = "Approver rejects cancellation (PENDING_CANCELLATION → APPROVED)")
+    public BookingResponse rejectCancellation(@PathVariable Long id, Authentication authentication) {
+        return bookingService.rejectCancellation(id, authentication.getName());
     }
 }

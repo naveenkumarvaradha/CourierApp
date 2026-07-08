@@ -8,8 +8,11 @@ import com.courierapp.enums.PartyStatus;
 import com.courierapp.exception.BusinessException;
 import com.courierapp.exception.ResourceNotFoundException;
 import com.courierapp.mapper.PartyMapper;
+import com.courierapp.repository.CompanyRepository;
 import com.courierapp.repository.PartyRepository;
 import com.courierapp.service.ApprovalAuthorizationService;
+import com.courierapp.kafka.CourierEventProducer;
+import com.courierapp.kafka.event.PartyEvent;
 import com.courierapp.service.AuditLogService;
 import com.courierapp.service.PartyService;
 import jakarta.persistence.criteria.Predicate;
@@ -35,18 +38,24 @@ public class PartyServiceImpl implements PartyService {
     private static final String MODULE = "MASTER";
 
     private final PartyRepository partyRepository;
+    private final CompanyRepository companyRepository;
     private final PartyMapper partyMapper;
     private final ApprovalAuthorizationService approvalAuthorizationService;
     private final AuditLogService auditLogService;
+    private final CourierEventProducer eventProducer;
 
     public PartyServiceImpl(PartyRepository partyRepository,
+                            CompanyRepository companyRepository,
                             PartyMapper partyMapper,
                             ApprovalAuthorizationService approvalAuthorizationService,
-                            AuditLogService auditLogService) {
+                            AuditLogService auditLogService,
+                            CourierEventProducer eventProducer) {
         this.partyRepository = partyRepository;
+        this.companyRepository = companyRepository;
         this.partyMapper = partyMapper;
         this.approvalAuthorizationService = approvalAuthorizationService;
         this.auditLogService = auditLogService;
+        this.eventProducer = eventProducer;
     }
 
     @Override
@@ -57,7 +66,20 @@ public class PartyServiceImpl implements PartyService {
         Specification<Party> spec = buildSpec(name, city, pincode, active);
         Page<Party> page = partyRepository.findAll(spec, pageable);
         log.debug("Found {} parties matching filters", page.getTotalElements());
-        return PageResponse.from(page, partyMapper::toResponse);
+        return PageResponse.from(page, p -> {
+            PartyResponse base = partyMapper.toResponse(p);
+            if (p.getPartyStatus() == PartyStatus.PENDING_APPROVAL) {
+                List<String> approvers = approvalAuthorizationService
+                        .resolveApproversAtLevel(p.getCreatedBy(), "MASTER", p.getCurrentApprovalLevel());
+                return new PartyResponse(base.id(), base.partyCode(), base.partyName(),
+                        base.addressLine1(), base.addressLine2(), base.city(), base.state(),
+                        base.pincode(), base.country(), base.phone(), base.email(), base.gstin(),
+                        base.partyType(), base.active(), base.partyStatus(), base.companyName(),
+                        base.currentApprovalLevel(), base.createdAt(), base.createdBy(),
+                        base.updatedAt(), base.updatedBy(), approvers);
+            }
+            return base;
+        });
     }
 
     @Override
@@ -65,7 +87,7 @@ public class PartyServiceImpl implements PartyService {
     public List<PartyResponse> listAllActive() {
         Specification<Party> spec = (root, q, cb) -> cb.and(
                 cb.equal(root.get("partyStatus"), PartyStatus.ACTIVE),
-                cb.notEqual(root.get("partyCode"), "COMPANY001")
+                cb.notLike(root.get("partyCode"), "COMPANY%")
         );
         List<Party> parties = partyRepository.findAll(spec, Sort.by("partyName"));
         log.debug("Returning {} active parties for dropdown (company party excluded)", parties.size());
@@ -87,10 +109,13 @@ public class PartyServiceImpl implements PartyService {
         party.setPartyCode(generatePartyCode());
         party.setPartyStatus(PartyStatus.PENDING_APPROVAL);
         party.setActive(false);
+        party.setCurrentApprovalLevel(1);
         Party saved = partyRepository.save(party);
         log.info("Party created: code={}, id={}, status=PENDING_APPROVAL", saved.getPartyCode(), saved.getId());
         auditLogService.log("PARTY", "CREATE", saved.getId(), saved.getPartyCode() + " " + saved.getPartyName(),
                 saved.getCreatedBy(), "Type=" + saved.getPartyType() + ", status=PENDING_APPROVAL");
+        eventProducer.publishPartyEvent(
+                PartyEvent.created(saved.getId(), saved.getPartyCode(), saved.getPartyName(), saved.getCreatedBy()));
         return partyMapper.toResponse(saved);
     }
 
@@ -99,6 +124,10 @@ public class PartyServiceImpl implements PartyService {
         log.info("Updating party id={}", id);
         Party party = findParty(id);
         apply(party, request);
+        // Always sync partyStatus with active flag (unless still pending approval)
+        if (party.getPartyStatus() != PartyStatus.PENDING_APPROVAL) {
+            party.setPartyStatus(request.active() ? PartyStatus.ACTIVE : PartyStatus.INACTIVE);
+        }
         Party saved = partyRepository.save(party);
         log.info("Party updated: code={}, id={}", saved.getPartyCode(), saved.getId());
         auditLogService.log("PARTY", "UPDATE", saved.getId(), saved.getPartyCode() + " " + saved.getPartyName(),
@@ -124,13 +153,30 @@ public class PartyServiceImpl implements PartyService {
     public PartyResponse approve(Long id, String approverUsername) {
         log.info("Approving party id={} by user='{}'", id, approverUsername);
         Party party = requirePendingApproval(id, approverUsername);
-        party.setPartyStatus(PartyStatus.ACTIVE);
-        party.setActive(true);
-        Party saved = partyRepository.save(party);
-        log.info("Party APPROVED: code={}, id={}, approver='{}'", saved.getPartyCode(), saved.getId(), approverUsername);
-        auditLogService.log("PARTY", "APPROVE", saved.getId(), saved.getPartyCode() + " " + saved.getPartyName(),
-                approverUsername, "Party activated");
-        return partyMapper.toResponse(saved);
+        String creator = party.getCreatedBy();
+        int currentLevel = party.getCurrentApprovalLevel();
+        int maxLevel = approvalAuthorizationService.getMaxLevel(creator, MODULE);
+
+        if (currentLevel < maxLevel) {
+            int nextLevel = currentLevel + 1;
+            party.setCurrentApprovalLevel(nextLevel);
+            Party saved = partyRepository.save(party);
+            log.info("Party Level {} approved, escalated to Level {}: code={}", currentLevel, nextLevel, saved.getPartyCode());
+            auditLogService.log("PARTY", "APPROVE", saved.getId(), saved.getPartyCode() + " " + saved.getPartyName(),
+                    approverUsername, "Level " + currentLevel + " approved — escalated to Level " + nextLevel);
+            return partyMapper.toResponse(saved);
+        } else {
+            party.setPartyStatus(PartyStatus.ACTIVE);
+            party.setActive(true);
+            Party saved = partyRepository.save(party);
+            log.info("Party APPROVED (final level {}): code={}, id={}, approver='{}'", currentLevel,
+                    saved.getPartyCode(), saved.getId(), approverUsername);
+            auditLogService.log("PARTY", "APPROVE", saved.getId(), saved.getPartyCode() + " " + saved.getPartyName(),
+                    approverUsername, "Final approval (Level " + currentLevel + ") — Party activated");
+            eventProducer.publishPartyEvent(
+                    PartyEvent.approved(saved.getId(), saved.getPartyCode(), saved.getPartyName(), creator, approverUsername));
+            return partyMapper.toResponse(saved);
+        }
     }
 
     @Override
@@ -143,6 +189,9 @@ public class PartyServiceImpl implements PartyService {
         log.info("Party REJECTED: code={}, id={}, approver='{}'", saved.getPartyCode(), saved.getId(), approverUsername);
         auditLogService.log("PARTY", "REJECT", saved.getId(), saved.getPartyCode() + " " + saved.getPartyName(),
                 approverUsername, "Remarks: " + remarks);
+        eventProducer.publishPartyEvent(
+                PartyEvent.rejected(saved.getId(), saved.getPartyCode(), saved.getPartyName(),
+                        party.getCreatedBy(), approverUsername, remarks));
         return partyMapper.toResponse(saved);
     }
 
@@ -152,9 +201,10 @@ public class PartyServiceImpl implements PartyService {
             throw new BusinessException("Only parties in PENDING_APPROVAL state can be approved or rejected");
         }
         String creator = party.getCreatedBy();
-        if (!approvalAuthorizationService.isAuthorizedApprover(approverUsername, creator, MODULE)) {
+        int level = party.getCurrentApprovalLevel();
+        if (!approvalAuthorizationService.isAuthorizedApproverAtLevel(approverUsername, creator, MODULE, level)) {
             throw new BusinessException(
-                    "You are not a designated approver for master data",
+                    "You are not a designated approver for master data at Level " + level,
                     org.springframework.http.HttpStatus.FORBIDDEN);
         }
         return party;
@@ -165,18 +215,24 @@ public class PartyServiceImpl implements PartyService {
     }
 
     private void apply(Party party, PartyRequest r) {
-        party.setPartyName(r.partyName());
-        party.setAddressLine1(r.addressLine1());
-        party.setAddressLine2(r.addressLine2());
-        party.setCity(r.city());
-        party.setState(r.state());
-        party.setPincode(r.pincode());
-        party.setCountry(r.country());
-        party.setPhone(r.phone());
-        party.setEmail(r.email());
-        party.setGstin(r.gstin());
+        party.setPartyName(upper(r.partyName()));
+        party.setAddressLine1(upper(r.addressLine1()));
+        party.setAddressLine2(upper(r.addressLine2()));
+        party.setCity(upper(r.city()));
+        party.setState(upper(r.state()));
+        party.setPincode(upper(r.pincode()));
+        party.setCountry(upper(r.country()));
+        party.setPhone(upper(r.phone()));
+        party.setEmail(r.email()); // email stays as-is
+        party.setGstin(upper(r.gstin()));
         party.setPartyType(r.partyType());
         party.setActive(r.active());
+        party.setCompanyName(r.companyName() != null && !r.companyName().isBlank()
+                ? r.companyName().toUpperCase(Locale.ROOT) : null);
+    }
+
+    private static String upper(String s) {
+        return s == null ? null : s.toUpperCase(Locale.ROOT);
     }
 
     private String generatePartyCode() {

@@ -17,10 +17,26 @@ export interface AuditLog {
 }
 
 export interface TokenResponse {
-  accessToken: string;
-  refreshToken: string;
-  tokenType: string;
+  accessToken: string | null;
+  refreshToken: string | null;
+  tokenType: string | null;
   expiresIn: number;
+  mfaRequired: boolean;
+  mfaPendingToken: string | null;
+}
+
+export interface MfaSetupResponse {
+  qrDataUri: string;
+  secret: string;
+}
+
+export interface UserMfaStatus {
+  id: number;
+  username: string;
+  fullName: string;
+  email: string;
+  mfaEnabled: boolean;
+  mfaConfigured: boolean;
 }
 
 export interface CurrentUser {
@@ -80,6 +96,7 @@ export interface UserAccount {
   companyName: string | null;
   roles: RoleSummary[];
   directPermissions: Permission[];
+  inactiveAt: string | null;
   createdAt: string;
   createdBy: string;
   updatedAt: string;
@@ -119,7 +136,20 @@ export interface Party {
   partyType: PartyType;
   active: boolean;
   partyStatus: PartyStatus;
+  companyName: string | null;
+  currentApprovalLevel: number;
   createdBy: string | null;
+  createdAt: string | null;
+  pendingApprovers?: string[] | null;
+}
+
+export interface MailConfig {
+  smtpHost: string | null;
+  smtpPort: number | null;
+  smtpUsername: string | null;
+  smtpFromName: string | null;
+  smtpTls: boolean | null;
+  configured: boolean;
 }
 
 export interface CompanySettings {
@@ -134,6 +164,45 @@ export interface CompanySettings {
   phone: string | null;
   email: string | null;
   gstin: string | null;
+  // SMTP config (password never returned)
+  smtpHost: string | null;
+  smtpPort: number | null;
+  smtpUsername: string | null;
+  smtpFromName: string | null;
+  smtpTls: boolean | null;
+  smtpConfigured: boolean;
+}
+
+export interface PasswordPolicy {
+  id: number | null;
+  restrictLastPasswords: number;
+  passwordExpiryDays: number;
+  expiryReminderDays: number;
+  sessionTimeoutHours: number;
+  sessionTimeoutMinutes: number;
+  maxLoginAttempts: number;
+  minPasswordLength: number;
+  requireUppercase: boolean;
+  requireLowercase: boolean;
+  requireDigit: boolean;
+  requireSpecialChar: boolean;
+}
+
+export interface ReportSchedule {
+  id: number;
+  scheduleName: string;
+  reportType: string;
+  frequency: string;
+  dayOfWeek: number | null;
+  dayOfMonth: number | null;
+  monthOfYear: number | null;
+  recipientEmails: string;
+  fileFormat: string;
+  enabled: boolean;
+  lastRunAt: string | null;
+  nextRunAt: string | null;
+  createdBy: string | null;
+  createdAt: string | null;
 }
 
 export interface CourierWay {
@@ -187,7 +256,8 @@ export type BookingStatus =
   | 'IN_TRANSIT'
   | 'DELIVERED'
   | 'CANCELLED'
-  | 'REJECTED';
+  | 'REJECTED'
+  | 'PENDING_CANCELLATION';
 
 export interface Booking {
   id: number;
@@ -207,8 +277,13 @@ export interface Booking {
   approverUsername: string | null;
   approvalTimestamp: string | null;
   approvalRemarks: string | null;
+  companyPoNo: string | null;
+  printTaken: boolean;
+  cancellationRemarks: string | null;
+  currentApprovalLevel: number;
   createdAt: string | null;
   createdBy: string | null;
+  pendingApprovers?: string[] | null;
 }
 
 export interface PartyBreakdown {
@@ -216,6 +291,38 @@ export interface PartyBreakdown {
   partyName: string;
   bookingCount: number;
   totalCharges: number;
+}
+
+export interface DashboardTasks {
+  bookingsPendingMyApproval: Booking[];
+  myBookingsPendingSent: Booking[];
+  partiesPendingMyApproval: Party[];
+  myPartiesPendingSent: Party[];
+  pendingToPrint: Booking[];
+  allPendingApprovalBookings: Booking[];
+  allPendingApprovalParties: Party[];
+}
+
+export interface ApprovalInfo {
+  currentLevel: number;
+  maxLevel: number;
+  approvers: string[];
+  summary: string;
+}
+
+export interface ApprovalRouting {
+  id: number;
+  roleId: number | null;
+  roleName: string | null;
+  userId: number | null;
+  username: string | null;
+  creatorRoleId: number | null;
+  creatorRoleName: string | null;
+  creatorUserId: number | null;
+  creatorUsername: string | null;
+  active: boolean;
+  module: string;
+  level: number;
 }
 
 export interface ReportSummary {
@@ -232,4 +339,13 @@ export interface ReportSummary {
   bySender: PartyBreakdown[];
   byReceiver: PartyBreakdown[];
   bookings: Booking[];
+}
+
+
+export interface StickerField {
+  fieldKey: string;
+  label: string;
+  visible: boolean;
+  sortOrder: number;
+  section: string; // HEADER | FROM | TO | DETAILS | BOTTOM
 }

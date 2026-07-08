@@ -2,6 +2,25 @@ server:
   port: 8080
   servlet:
     context-path: /api
+  compression:
+    enabled: true
+    mime-types: application/json,text/plain,text/html,text/xml,application/xml
+    min-response-size: 1024
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 25
+    max-connections: 2000
+    accept-count: 200
+    connection-timeout: 20000
+    keep-alive-timeout: 30000
+    max-keep-alive-requests: 200
+  server-header: ""
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+    include-exception: false
 
 spring:
   application:
@@ -12,8 +31,15 @@ spring:
     password: ${DB_PASSWORD:Courier@123}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 20
-      minimum-idle: 5
+      maximum-pool-size: 30
+      minimum-idle: 10
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      connection-timeout: 5000
+      keepalive-time: 60000
+      pool-name: CourierHikariPool
+      connection-test-query: SELECT 1
+      leak-detection-threshold: 60000
   jpa:
     hibernate:
       ddl-auto: validate
@@ -22,6 +48,12 @@ spring:
         format_sql: false
         jdbc:
           time_zone: UTC
+          batch_size: 25
+          fetch_size: 100
+        order_inserts: true
+        order_updates: true
+        default_batch_fetch_size: 25
+        generate_statistics: false
     open-in-view: false
   flyway:
     enabled: true
@@ -30,25 +62,73 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+  kafka:
+    bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+        max.block.ms: 3000
+        request.timeout.ms: 3000
+        delivery.timeout.ms: 5000
+    consumer:
+      group-id: courier-app
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      auto-offset-reset: earliest
+      properties:
+        spring.json.trusted.packages: "com.courierapp.kafka.event"
+    listener:
+      missing-topics-fatal: false
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+      jedis:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 2
+          max-wait: 2000ms
+  cache:
+    type: redis
+    redis:
+      time-to-live: 300000
+      cache-null-values: false
   mail:
-    host: ${MAIL_HOST:smtp.gmail.com}
+    host: ${MAIL_HOST:smtp.office365.com}
     port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:your-email@gmail.com}
-    password: ${MAIL_PASSWORD:your-app-password}
+    username: ${MAIL_USERNAME:naveenkumarv@ctl-india.com}
+    password: "${MAIL_PASSWORD:Panther@%$!#^}"
     properties:
       mail:
+        debug: false
         smtp:
           auth: true
           starttls:
             enable: true
+            required: true
+          connectiontimeout: 15000
+          timeout: 15000
+          writetimeout: 15000
+          ehlo: true
+          ssl:
+            protocols: TLSv1.2
 
 app:
+  kafka:
+    enabled: ${KAFKA_ENABLED:false}
   jwt:
     secret: ${JWT_SECRET:CHANGE_THIS_TO_A_LONG_RANDOM_SECRET_IN_PRODUCTION_ENV_VAR}
-    access-token-expiry-minutes: 30
+    access-token-expiry-minutes: 15
     refresh-token-expiry-days: 7
   cors:
-    allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://tkllt031:5173,http://192.168.2.245:5173}
+    allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://tkllt031:5173,http://192.168.*:5173,http://10.*.*.*:5173,http://172.*.*.*:5173}
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
   name: Courier Booking
   booking:
@@ -59,11 +139,42 @@ app:
 
 logging:
   level:
+    root: WARN
     com.courierapp: INFO
     org.springframework.security: WARN
+    org.springframework.web: WARN
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql: WARN
+    org.springframework.mail: WARN
+    com.sun.mail: WARN
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,threaddump
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: when-authorized
+  info:
+    env:
+      enabled: true
+    java:
+      enabled: true
+    os:
+      enabled: true
+    build:
+      enabled: true
+  server:
+    port: 8080
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+info:
+  app:
+    name: ShipDesk Courier Booking
+    version: 1.0.0
+    description: Enterprise Courier Booking System

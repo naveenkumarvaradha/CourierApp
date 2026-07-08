@@ -1,24 +1,44 @@
 import { api, BASE_URL, tokenStore } from './client';
+import type { MfaSetupResponse } from '../types';
 import type {
+  ApprovalInfo,
   ApprovalRouting,
   AuditLog,
   Booking,
   Company,
+  DashboardTasks,
   CompanySettings,
   CourierWay,
   CurrentUser,
   Department,
   FlexFieldDefinition,
   FlexFieldValues,
+  MailConfig,
   PackageType,
   PageResponse,
   Party,
+  PasswordPolicy,
   Permission,
+  ReportSchedule,
   ReportSummary,
   Role,
+  StickerField,
   TokenResponse,
   UserAccount,
 } from '../types';
+
+// ---------- Dashboard ----------
+export const dashboardApi = {
+  getTasks: () => api.get<DashboardTasks>('/dashboard').then((r) => r.data),
+};
+
+// ---------- Approval info ----------
+export const approvalApi = {
+  bookingInfo: (id: number) =>
+    api.get<ApprovalInfo>(`/bookings/${id}/approval-info`).then((r) => r.data),
+  partyInfo: (id: number) =>
+    api.get<ApprovalInfo>(`/master/parties/${id}/approval-info`).then((r) => r.data),
+};
 
 // ---------- Auth ----------
 export const authApi = {
@@ -28,10 +48,20 @@ export const authApi = {
   me: () => api.get<CurrentUser>('/auth/me').then((r) => r.data),
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post<{ message: string }>('/auth/change-password', { currentPassword, newPassword }).then((r) => r.data),
-  forgotPassword: (email: string) =>
-    api.post<{ message: string }>('/auth/forgot-password', { email }).then((r) => r.data),
+  forgotPassword: (username: string) =>
+    api.post<{ message: string }>('/auth/forgot-password', { username }).then((r) => r.data),
   resetPassword: (token: string, newPassword: string) =>
     api.post<{ message: string }>('/auth/reset-password', { token, newPassword }).then((r) => r.data),
+  logout: () =>
+    api.post<{ message: string }>('/auth/logout').then((r) => r.data),
+  setupMfa: () =>
+    api.post<MfaSetupResponse>('/auth/setup-mfa').then((r) => r.data),
+  enableMfa: (code: string) =>
+    api.post<{ message: string }>('/auth/enable-mfa', { code }).then((r) => r.data),
+  disableMfa: () =>
+    api.post<{ message: string }>('/auth/disable-mfa').then((r) => r.data),
+  confirmMfa: (mfaPendingToken: string, code: string) =>
+    api.post<import('../types').TokenResponse>('/auth/confirm-mfa', { mfaPendingToken, code }).then((r) => r.data),
 };
 
 // ---------- Admin ----------
@@ -55,9 +85,11 @@ export const adminApi = {
   updateUser: (id: number, body: Record<string, unknown>) =>
     api.put<UserAccount>(`/admin/users/${id}`, body).then((r) => r.data),
   deleteUser: (id: number) => api.delete(`/admin/users/${id}`),
+  getUserHistory: (id: number, page = 0, size = 20) =>
+    api.get<PageResponse<import('../types').AuditLog>>(`/admin/users/${id}/history`, { params: { page, size } }).then((r) => r.data),
 
   listApprovalRouting: () => api.get<ApprovalRouting[]>('/admin/approval-routing').then((r) => r.data),
-  createApprovalRouting: (body: { roleId: number | null; userId: number | null; creatorRoleId: number | null; creatorUserId: number | null; active: boolean; module?: string }) =>
+  createApprovalRouting: (body: { roleId: number | null; userId: number | null; creatorRoleId: number | null; creatorUserId: number | null; active: boolean; module?: string; level?: number }) =>
     api.post<ApprovalRouting>('/admin/approval-routing', body).then((r) => r.data),
   deleteApprovalRouting: (id: number) => api.delete(`/admin/approval-routing/${id}`),
 
@@ -96,11 +128,44 @@ export const adminApi = {
   updateCompany: (id: number, body: { companyCode: string; name: string; active: boolean }) =>
     api.put<Company>(`/admin/companies/${id}`, body).then((r) => r.data),
   deleteCompany: (id: number) => api.delete(`/admin/companies/${id}`),
+  getCompanySettingsById: (id: number) =>
+    api.get<CompanySettings>(`/admin/companies/${id}/settings`).then((r) => r.data),
+  updateCompanySettingsById: (id: number, body: Record<string, unknown>) =>
+    api.put<CompanySettings>(`/admin/companies/${id}/settings`, body).then((r) => r.data),
+
+  // Password policy
+  getPasswordPolicy: () => api.get<PasswordPolicy>('/admin/password-policy').then((r) => r.data),
+  updatePasswordPolicy: (body: Record<string, unknown>) =>
+    api.put<PasswordPolicy>('/admin/password-policy', body).then((r) => r.data),
+
+  // Sticker field config
+  getStickerConfig: (companyId: number) =>
+    api.get<StickerField[]>(`/admin/companies/${companyId}/sticker-config`).then((r) => r.data),
+  saveStickerConfig: (companyId: number, fields: StickerField[]) =>
+    api.put<StickerField[]>(`/admin/companies/${companyId}/sticker-config`, fields).then((r) => r.data),
+
+  // Report schedules
+  listReportSchedules: () => api.get<ReportSchedule[]>('/admin/report-schedules').then((r) => r.data),
+  createReportSchedule: (body: Record<string, unknown>) =>
+    api.post<ReportSchedule>('/admin/report-schedules', body).then((r) => r.data),
+  updateReportSchedule: (id: number, body: Record<string, unknown>) =>
+    api.put<ReportSchedule>(`/admin/report-schedules/${id}`, body).then((r) => r.data),
+  deleteReportSchedule: (id: number) => api.delete(`/admin/report-schedules/${id}`),
 
   searchAuditLogs: (params: {
     module?: string; action?: string; performedBy?: string;
     fromDate?: string; toDate?: string; page?: number; size?: number;
   }) => api.get<PageResponse<AuditLog>>('/admin/audit-logs', { params }).then((r) => r.data),
+
+  // Mail configuration
+  getMailConfig: () => api.get<MailConfig>('/admin/mail-config').then((r) => r.data),
+  saveMailConfig: (body: Record<string, unknown>) =>
+    api.put<MailConfig>('/admin/mail-config', body).then((r) => r.data),
+  testMailConfig: (email: string, smtpParams?: {
+    smtpHost?: string; smtpPort?: string; smtpUsername?: string;
+    smtpPassword?: string; smtpFromName?: string; smtpTls?: boolean;
+  }) =>
+    api.post<{ message: string }>('/admin/mail-config/test', { email, ...smtpParams }).then((r) => r.data),
 
   listFlexFields: (module?: string) =>
     api.get<FlexFieldDefinition[]>('/admin/flex-fields', { params: module ? { module } : {} }).then((r) => r.data),
@@ -142,7 +207,7 @@ export const partyApi = {
 
 // ---------- Bookings ----------
 export const bookingApi = {
-  search: (params: Record<string, unknown>) =>
+  search: (params: Record<string, string | number | boolean | undefined | null>) =>
     api.get<PageResponse<Booking>>('/bookings', { params }).then((r) => r.data),
   get: (id: number) => api.get<Booking>(`/bookings/${id}`).then((r) => r.data),
   create: (body: Record<string, unknown>) => api.post<Booking>('/bookings', body).then((r) => r.data),
@@ -161,6 +226,13 @@ export const bookingApi = {
   stickerUrl: (id: number) => `${BASE_URL}/bookings/${id}/sticker`,
   fetchSticker: (id: number) =>
     api.get(`/bookings/${id}/sticker`, { responseType: 'blob' }).then((r) => r.data as Blob),
+  revise: (id: number) => api.post<Booking>(`/bookings/${id}/revise`).then((r) => r.data),
+  requestCancellation: (id: number, remarks?: string) =>
+    api.post<Booking>(`/bookings/${id}/request-cancellation`, null, { params: remarks ? { remarks } : {} }).then((r) => r.data),
+  approveCancellation: (id: number) =>
+    api.post<Booking>(`/bookings/${id}/approve-cancellation`).then((r) => r.data),
+  rejectCancellation: (id: number) =>
+    api.post<Booking>(`/bookings/${id}/reject-cancellation`).then((r) => r.data),
 };
 
 // ---------- Reports ----------
@@ -169,6 +241,30 @@ export const reportApi = {
     api.get<ReportSummary>('/reports/summary', { params }).then((r) => r.data),
   exportExcel: (params: { granularity: string; from?: string; to?: string }) =>
     api.get('/reports/export', { params, responseType: 'blob' }).then((r) => r.data as Blob),
+
+  // Booking detail
+  bookingDetailExcel: (from: string, to: string, status?: string) =>
+    api.get('/reports/bookings/detail/excel', { params: { from, to, status: status || undefined }, responseType: 'blob' }).then((r) => r.data as Blob),
+  bookingDetailPdf: (from: string, to: string, status?: string) =>
+    api.get('/reports/bookings/detail/pdf', { params: { from, to, status: status || undefined }, responseType: 'blob' }).then((r) => r.data as Blob),
+
+  // User Creation
+  userCreationExcel: (from: string, to: string) =>
+    api.get('/reports/users/creation/excel', { params: { from, to }, responseType: 'blob' }).then((r) => r.data as Blob),
+  userCreationPdf: (from: string, to: string) =>
+    api.get('/reports/users/creation/pdf', { params: { from, to }, responseType: 'blob' }).then((r) => r.data as Blob),
+
+  // User Inactive
+  userInactiveExcel: (from: string, to: string) =>
+    api.get('/reports/users/inactive/excel', { params: { from, to }, responseType: 'blob' }).then((r) => r.data as Blob),
+  userInactivePdf: (from: string, to: string) =>
+    api.get('/reports/users/inactive/pdf', { params: { from, to }, responseType: 'blob' }).then((r) => r.data as Blob),
+
+  // Party / Master
+  partyExcel: (from: string, to: string) =>
+    api.get('/reports/parties/excel', { params: { from, to }, responseType: 'blob' }).then((r) => r.data as Blob),
+  partyPdf: (from: string, to: string) =>
+    api.get('/reports/parties/pdf', { params: { from, to }, responseType: 'blob' }).then((r) => r.data as Blob),
 };
 
 export { tokenStore };

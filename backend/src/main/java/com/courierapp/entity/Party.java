@@ -3,6 +3,7 @@ package com.courierapp.entity;
 import com.courierapp.enums.PartyStatus;
 import com.courierapp.enums.PartyType;
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.*;
 
 @Entity
@@ -61,4 +62,15 @@ public class Party extends Auditable {
     @Enumerated(EnumType.STRING)
     @Column(name = "party_status", nullable = false, length = 30)
     private PartyStatus partyStatus;
+
+    @Column(name = "company_name", length = 255)
+    private String companyName;
+
+    @Column(name = "current_approval_level", nullable = false)
+    private int currentApprovalLevel = 1;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private Company company;
 }

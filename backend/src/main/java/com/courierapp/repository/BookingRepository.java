@@ -12,4 +12,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long>, JpaSpec
     Optional<Booking> findByBookingNumber(String bookingNumber);
     Optional<Booking> findByAwbNumber(String awbNumber);
     List<Booking> findByBookingDateBetween(LocalDate from, LocalDate to);
+    List<Booking> findByBookingDateBetweenAndStatusOrderByBookingDateAsc(
+            LocalDate from, LocalDate to, com.courierapp.enums.BookingStatus status);
+    long countByStatus(com.courierapp.enums.BookingStatus status);
 }

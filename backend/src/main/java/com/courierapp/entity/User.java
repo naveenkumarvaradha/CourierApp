@@ -28,7 +28,7 @@ public class User extends Auditable {
     @Column(name = "full_name", nullable = false, length = 150)
     private String fullName;
 
-    @Column(name = "email", nullable = false, unique = true, length = 150)
+    @Column(name = "email", nullable = false, length = 150)
     private String email;
 
     @Column(name = "phone", length = 30)
@@ -36,6 +36,9 @@ public class User extends Auditable {
 
     @Column(name = "active", nullable = false)
     private boolean active;
+
+    @Column(name = "inactive_at")
+    private java.time.Instant inactiveAt;
 
     @Builder.Default
     @ManyToMany(fetch = FetchType.EAGER)
@@ -51,6 +54,12 @@ public class User extends Auditable {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "company_id")
     private Company company;
+
+    @Column(name = "mfa_secret", length = 64)
+    private String mfaSecret;
+
+    @Column(name = "mfa_enabled", nullable = false)
+    private boolean mfaEnabled;
 
     /** Direct per-user permission grants in addition to those from roles. */
     @Builder.Default

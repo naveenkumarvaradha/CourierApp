@@ -6,12 +6,19 @@ import java.time.LocalDate;
 
 public interface ReportService {
 
-    /**
-     * @param granularity one of: weekly, monthly, yearly, custom
-     * @param from        custom start (used when granularity=custom, else derived)
-     * @param to          custom end (used when granularity=custom, else today)
-     */
     ReportSummaryResponse summary(String granularity, LocalDate from, LocalDate to);
-
     byte[] exportExcel(String granularity, LocalDate from, LocalDate to);
+    byte[] exportBookingPdf(LocalDate from, LocalDate to);
+
+    byte[] exportUserCreationExcel(LocalDate from, LocalDate to);
+    byte[] exportUserCreationPdf(LocalDate from, LocalDate to);
+
+    byte[] exportUserInactiveExcel(LocalDate from, LocalDate to);
+    byte[] exportUserInactivePdf(LocalDate from, LocalDate to);
+
+    byte[] exportPartyExcel(LocalDate from, LocalDate to);
+    byte[] exportPartyPdf(LocalDate from, LocalDate to);
+
+    byte[] exportBookingDetailExcel(LocalDate from, LocalDate to, String status);
+    byte[] exportBookingDetailPdf(LocalDate from, LocalDate to, String status);
 }

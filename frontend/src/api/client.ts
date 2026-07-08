@@ -1,7 +1,8 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import type { TokenResponse } from '../types';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL
+  ?? `http://${window.location.hostname}:8080/api`;
 
 const ACCESS_KEY = 'cb_access_token';
 const REFRESH_KEY = 'cb_refresh_token';
@@ -73,9 +74,9 @@ api.interceptors.response.use(
         const { data } = await axios.post<TokenResponse>(`${BASE_URL}/auth/refresh`, {
           refreshToken,
         });
-        tokenStore.set(data.accessToken, data.refreshToken);
+        tokenStore.set(data.accessToken!, data.refreshToken!);
         flushQueue(data.accessToken);
-        original.headers.Authorization = `Bearer ${data.accessToken}`;
+        original.headers.Authorization = `Bearer ${data.accessToken!}`;
         return api(original);
       } catch (refreshErr) {
         flushQueue(null);
@@ -97,9 +98,30 @@ function forceLogout() {
   }
 }
 
+export async function extractBlobError(err: unknown): Promise<string> {
+  if (err && typeof err === 'object' && 'response' in err) {
+    const resp = (err as { response?: { data?: unknown; status?: number } }).response;
+    if (resp?.data instanceof Blob) {
+      try {
+        const text = await resp.data.text();
+        const json = JSON.parse(text) as { message?: string };
+        if (json.message) return json.message;
+      } catch { /* ignore */ }
+      return `Server error (${resp.status ?? 500})`;
+    }
+  }
+  return extractErrorMessage(err);
+}
+
 export function extractErrorMessage(err: unknown): string {
   if (axios.isAxiosError(err)) {
-    const data = err.response?.data as { message?: string; fieldErrors?: Record<string, string> } | undefined;
+    const raw = err.response?.data;
+    // blob responses (file downloads) return error body as Blob — parse it
+    if (raw instanceof Blob && raw.type.includes('json')) {
+      // async parse not possible here; return generic message
+      return `Server error (${err.response?.status ?? 500}) — check backend logs`;
+    }
+    const data = raw as { message?: string; fieldErrors?: Record<string, string> } | undefined;
     if (data?.fieldErrors) {
       return Object.values(data.fieldErrors).join(', ');
     }

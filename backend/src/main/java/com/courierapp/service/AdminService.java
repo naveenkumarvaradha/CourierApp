@@ -25,15 +25,34 @@ public interface AdminService {
     UserResponse updateUser(Long id, UserUpdateRequest request);
     void deleteUser(Long id);
 
+    // MFA admin management
+    PageResponse<UserMfaStatusResponse> listUserMfaStatus(String search, Pageable pageable);
+    void adminDisableMfa(Long userId);
+    void adminResetMfa(Long userId);
+
     // Approval routing
     List<ApprovalRoutingResponse> listApprovalRouting();
     ApprovalRoutingResponse createApprovalRouting(ApprovalRoutingRequest request);
     ApprovalRoutingResponse updateApprovalRouting(Long id, ApprovalRoutingRequest request);
     void deleteApprovalRouting(Long id);
 
+    // Password policy
+    PasswordPolicyResponse getPasswordPolicy();
+    PasswordPolicyResponse updatePasswordPolicy(PasswordPolicyRequest request);
+
     // Company settings
     CompanySettingsResponse getCompanySettings();
     CompanySettingsResponse updateCompanySettings(CompanySettingsRequest request);
+    CompanySettingsResponse getCompanySettingsByCompanyId(Long companyId);
+    CompanySettingsResponse updateCompanySettingsByCompanyId(Long companyId, CompanySettingsRequest request);
+
+    MailConfigResponse getMailConfig();
+    MailConfigResponse saveMailConfig(MailConfigRequest request);
+
+    // Company logo
+    void saveCompanyLogo(Long companyId, byte[] data, String contentType);
+    java.util.Optional<LogoDto> getCompanyLogo(Long companyId);
+    void deleteCompanyLogo(Long companyId);
 
     // Courier ways
     List<CourierWayResponse> listCourierWays();
@@ -62,4 +81,8 @@ public interface AdminService {
     CompanyResponse createCompany(CompanyRequest request);
     CompanyResponse updateCompany(Long id, CompanyRequest request);
     void deleteCompany(Long id);
+
+    // Sticker field config
+    List<StickerFieldDto> getStickerFieldConfig(Long companyId);
+    List<StickerFieldDto> saveStickerFieldConfig(Long companyId, List<StickerFieldDto> fields);
 }

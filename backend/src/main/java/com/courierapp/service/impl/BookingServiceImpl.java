@@ -28,6 +28,7 @@ import com.courierapp.service.AuditLogService;
 import com.courierapp.service.BookingNumberGenerator;
 import com.courierapp.service.BookingService;
 import com.courierapp.service.StickerPdfService;
+import com.courierapp.kafka.event.BookingEvent;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -47,7 +48,7 @@ import java.util.Map;
 import java.util.Set;
 
 @Slf4j
-@Service
+@Service("bookingService")
 @Transactional
 public class BookingServiceImpl implements BookingService {
 
@@ -69,6 +70,8 @@ public class BookingServiceImpl implements BookingService {
     private final StickerPdfService stickerPdfService;
     private final ApprovalAuthorizationService approvalAuthorizationService;
     private final AuditLogService auditLogService;
+    private final com.courierapp.repository.StickerFieldConfigRepository stickerFieldConfigRepository;
+    private final com.courierapp.kafka.CourierEventProducer eventProducer;
 
     public BookingServiceImpl(BookingRepository bookingRepository,
                               PartyRepository partyRepository,
@@ -80,7 +83,9 @@ public class BookingServiceImpl implements BookingService {
                               BookingMapper bookingMapper,
                               StickerPdfService stickerPdfService,
                               ApprovalAuthorizationService approvalAuthorizationService,
-                              AuditLogService auditLogService) {
+                              AuditLogService auditLogService,
+                              com.courierapp.repository.StickerFieldConfigRepository stickerFieldConfigRepository,
+                              com.courierapp.kafka.CourierEventProducer eventProducer) {
         this.bookingRepository = bookingRepository;
         this.partyRepository = partyRepository;
         this.companySettingsRepository = companySettingsRepository;
@@ -92,15 +97,18 @@ public class BookingServiceImpl implements BookingService {
         this.stickerPdfService = stickerPdfService;
         this.approvalAuthorizationService = approvalAuthorizationService;
         this.auditLogService = auditLogService;
+        this.stickerFieldConfigRepository = stickerFieldConfigRepository;
+        this.eventProducer = eventProducer;
     }
 
     @Override
     @Transactional(readOnly = true)
     public PageResponse<BookingResponse> search(String bookingNumber, LocalDate fromDate, LocalDate toDate,
                                                 BookingStatus status, Long senderId, Long receiverId,
-                                                CourierMode mode, Pageable pageable) {
+                                                CourierMode mode, String receiverName, String receiverCompanyName,
+                                                Pageable pageable) {
         Specification<Booking> spec = buildSpec(bookingNumber, fromDate, toDate, status,
-                senderId, receiverId, mode);
+                senderId, receiverId, mode, receiverName, receiverCompanyName);
         Page<Booking> page = bookingRepository.findAll(spec, pageable);
         return PageResponse.from(page, bookingMapper::toResponse);
     }
@@ -116,12 +124,15 @@ public class BookingServiceImpl implements BookingService {
         LocalDate today = LocalDate.now(ZoneId.systemDefault());
         Booking booking = new Booking();
         apply(booking, request, today);
-        booking.setBookingNumber(bookingNumberGenerator.next(today));
+        String companyCode = resolveCompanyCode();
+        booking.setBookingNumber(bookingNumberGenerator.next(today, companyCode));
         booking.setStatus(BookingStatus.BOOKED);
         Booking saved = bookingRepository.save(booking);
         auditLogService.log("BOOKING", "CREATE", saved.getId(), saved.getBookingNumber(),
                 saved.getCreatedBy(), "Receiver=" + saved.getReceiver().getPartyName()
                         + ", mode=" + saved.getCourierMode());
+        eventProducer.publishBookingEvent(
+                BookingEvent.created(saved.getId(), saved.getBookingNumber(), saved.getCreatedBy(), companyCode));
         return bookingMapper.toResponse(saved);
     }
 
@@ -158,23 +169,45 @@ public class BookingServiceImpl implements BookingService {
             throw new BusinessException("Only BOOKED bookings can be submitted for approval");
         }
         booking.setStatus(BookingStatus.PENDING_APPROVAL);
+        booking.setCurrentApprovalLevel(1);
         Booking saved = bookingRepository.save(booking);
         auditLogService.log("BOOKING", "SUBMIT", saved.getId(), saved.getBookingNumber(),
-                saved.getUpdatedBy(), "Submitted for approval");
+                saved.getUpdatedBy(), "Submitted for approval — awaiting Level 1");
+        eventProducer.publishBookingEvent(
+                BookingEvent.submitted(saved.getId(), saved.getBookingNumber(), saved.getCreatedBy()));
         return bookingMapper.toResponse(saved);
     }
 
     @Override
     public BookingResponse approve(Long id, ApprovalDecisionRequest request, String approverUsername) {
         Booking booking = requirePendingApproval(id, approverUsername);
-        booking.setStatus(BookingStatus.APPROVED);
+        String creator = booking.getCreatedBy();
+        int currentLevel = booking.getCurrentApprovalLevel();
+        int maxLevel = approvalAuthorizationService.getMaxLevel(creator, "BOOKING");
+
         booking.setApproverUsername(approverUsername);
         booking.setApprovalTimestamp(Instant.now());
         booking.setApprovalRemarks(request != null ? request.remarks() : null);
-        Booking saved = bookingRepository.save(booking);
-        auditLogService.log("BOOKING", "APPROVE", saved.getId(), saved.getBookingNumber(),
-                approverUsername, "Remarks: " + (request != null ? request.remarks() : ""));
-        return bookingMapper.toResponse(saved);
+
+        if (currentLevel < maxLevel) {
+            // Escalate to next level
+            int nextLevel = currentLevel + 1;
+            booking.setCurrentApprovalLevel(nextLevel);
+            Booking saved = bookingRepository.save(booking);
+            auditLogService.log("BOOKING", "APPROVE", saved.getId(), saved.getBookingNumber(),
+                    approverUsername, "Level " + currentLevel + " approved — escalated to Level " + nextLevel);
+            return bookingMapper.toResponse(saved);
+        } else {
+            // Final level approved
+            booking.setStatus(BookingStatus.APPROVED);
+            Booking saved = bookingRepository.save(booking);
+            auditLogService.log("BOOKING", "APPROVE", saved.getId(), saved.getBookingNumber(),
+                    approverUsername, "Final approval (Level " + currentLevel + "). Remarks: "
+                            + (request != null ? request.remarks() : ""));
+            eventProducer.publishBookingEvent(BookingEvent.approved(saved.getId(), saved.getBookingNumber(),
+                    creator, approverUsername, request != null ? request.remarks() : null));
+            return bookingMapper.toResponse(saved);
+        }
     }
 
     @Override
@@ -187,6 +220,8 @@ public class BookingServiceImpl implements BookingService {
         Booking saved = bookingRepository.save(booking);
         auditLogService.log("BOOKING", "REJECT", saved.getId(), saved.getBookingNumber(),
                 approverUsername, "Remarks: " + (request != null ? request.remarks() : ""));
+        eventProducer.publishBookingEvent(BookingEvent.rejected(saved.getId(), saved.getBookingNumber(),
+                booking.getCreatedBy(), approverUsername, request != null ? request.remarks() : null));
         return bookingMapper.toResponse(saved);
     }
 
@@ -242,9 +277,28 @@ public class BookingServiceImpl implements BookingService {
 
         // Look up creator's user details for FROM block
         User creator = userRepository.findByUsername(booking.getCreatedBy()).orElse(null);
-        CompanySettings settings = companySettingsRepository.findAll().stream().findFirst().orElse(null);
 
-        byte[] pdf = stickerPdfService.generate(booking, creator, settings);
+        // Load company settings by creator's company so logo data is correct
+        Long companyId = (creator != null && creator.getCompany() != null)
+                ? creator.getCompany().getId() : null;
+        CompanySettings settings = (companyId != null)
+                ? companySettingsRepository.findByCompanyId(companyId).orElse(null)
+                : companySettingsRepository.findAll().stream().findFirst().orElse(null);
+        if (companyId == null && settings != null && settings.getCompany() != null) {
+            companyId = settings.getCompany().getId();
+        }
+
+        java.util.List<com.courierapp.dto.admin.StickerFieldDto> fieldConfig = null;
+        if (companyId != null) {
+            var saved = stickerFieldConfigRepository.findByCompanyIdOrderBySortOrder(companyId);
+            if (!saved.isEmpty()) {
+                fieldConfig = saved.stream().map(s -> new com.courierapp.dto.admin.StickerFieldDto(
+                        s.getFieldKey(), s.getLabel(), s.isVisible(), s.getSortOrder(),
+                        s.getSection() != null ? s.getSection() : "BOTTOM")).toList();
+            }
+        }
+
+        byte[] pdf = stickerPdfService.generate(booking, creator, settings, fieldConfig);
 
         // Mark print as taken
         if (!booking.isPrintTaken()) {
@@ -284,8 +338,8 @@ public class BookingServiceImpl implements BookingService {
         if (booking.getStatus() != BookingStatus.APPROVED) {
             throw new BusinessException("Only APPROVED bookings can be requested for cancellation");
         }
-        if (booking.getAwbNumber() != null && !booking.getAwbNumber().isBlank() && booking.isPrintTaken()) {
-            throw new BusinessException("Cannot cancel: AWB number assigned and sticker already printed");
+        if (booking.getAwbNumber() != null && !booking.getAwbNumber().isBlank()) {
+            throw new BusinessException("Cannot cancel: AWB number has already been assigned to this booking");
         }
         booking.setStatus(BookingStatus.PENDING_CANCELLATION);
         booking.setCancellationRemarks(remarks);
@@ -338,9 +392,10 @@ public class BookingServiceImpl implements BookingService {
             throw new BusinessException("Only bookings in PENDING_APPROVAL state can be approved or rejected");
         }
         String creator = booking.getCreatedBy();
-        if (!approvalAuthorizationService.isAuthorizedApprover(approverUsername, creator)) {
+        int level = booking.getCurrentApprovalLevel();
+        if (!approvalAuthorizationService.isAuthorizedApproverAtLevel(approverUsername, creator, "BOOKING", level)) {
             throw new BusinessException(
-                    "You are not a designated approver for this booking",
+                    "You are not a designated approver for this booking at Level " + level,
                     org.springframework.http.HttpStatus.FORBIDDEN);
         }
         return booking;
@@ -386,9 +441,15 @@ public class BookingServiceImpl implements BookingService {
         return settings.getLinkedParty();
     }
 
+    private String resolveCompanyCode() {
+        return companySettingsRepository.findAll().stream().findFirst()
+                .map(s -> s.getCompany() != null ? s.getCompany().getCompanyCode() : null)
+                .orElse(null);
+    }
+
     private Specification<Booking> buildSpec(String bookingNumber, LocalDate fromDate, LocalDate toDate,
                                              BookingStatus status, Long senderId, Long receiverId,
-                                             CourierMode mode) {
+                                             CourierMode mode, String receiverName, String receiverCompanyName) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             if (StringUtils.hasText(bookingNumber)) {
@@ -413,7 +474,22 @@ public class BookingServiceImpl implements BookingService {
             if (mode != null) {
                 predicates.add(cb.equal(root.get("courierMode"), mode));
             }
+            if (StringUtils.hasText(receiverName)) {
+                predicates.add(cb.like(cb.lower(root.get("receiver").get("partyName")),
+                        "%" + receiverName.toLowerCase() + "%"));
+            }
+            if (StringUtils.hasText(receiverCompanyName)) {
+                predicates.add(cb.like(cb.lower(root.get("receiver").get("companyName")),
+                        "%" + receiverCompanyName.toLowerCase() + "%"));
+            }
             return cb.and(predicates.toArray(new Predicate[0]));
         };
+    }
+
+    @Override
+    public boolean isCreatorOf(Long id, String username) {
+        return bookingRepository.findById(id)
+                .map(b -> username != null && username.equals(b.getCreatedBy()))
+                .orElse(false);
     }
 }

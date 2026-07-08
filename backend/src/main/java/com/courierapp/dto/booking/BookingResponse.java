@@ -9,6 +9,7 @@ import com.courierapp.enums.CourierMode;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 
 public record BookingResponse(
         Long id,
@@ -31,8 +32,10 @@ public record BookingResponse(
         String companyPoNo,
         boolean printTaken,
         String cancellationRemarks,
+        int currentApprovalLevel,
         Instant createdAt,
         String createdBy,
         Instant updatedAt,
-        String updatedBy
+        String updatedBy,
+        List<String> pendingApprovers
 ) {}

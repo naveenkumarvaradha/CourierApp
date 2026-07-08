@@ -101,6 +101,12 @@ public class AuditLogService {
         };
     }
 
+    @Transactional(readOnly = true)
+    public PageResponse<AuditLogResponse> getEntityHistory(String module, Long entityId, Pageable pageable) {
+        Page<AuditLog> page = repo.findByModuleAndEntityIdOrderByCreatedAtDesc(module.toUpperCase(), entityId, pageable);
+        return PageResponse.from(page, this::toResponse);
+    }
+
     private AuditLogResponse toResponse(AuditLog a) {
         return new AuditLogResponse(a.getId(), a.getModule(), a.getAction(),
                 a.getEntityId(), a.getEntityName(), a.getPerformedBy(),

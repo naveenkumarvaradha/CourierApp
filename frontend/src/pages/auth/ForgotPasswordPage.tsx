@@ -8,7 +8,7 @@ import { authApi } from '../../api/endpoints';
 import { extractErrorMessage } from '../../api/client';
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,7 +19,7 @@ export default function ForgotPasswordPage() {
     setMessage('');
     setLoading(true);
     try {
-      const res = await authApi.forgotPassword(email);
+      const res = await authApi.forgotPassword(username.trim());
       setMessage(res.message);
     } catch (err) {
       setError(extractErrorMessage(err));
@@ -37,7 +37,7 @@ export default function ForgotPasswordPage() {
             <LocalShippingIcon sx={{ fontSize: 48, color: 'primary.main' }} />
             <Typography variant="h5" fontWeight={700}>Forgot Password</Typography>
             <Typography variant="body2" color="text.secondary" textAlign="center">
-              Enter your registered email address and we'll send you a reset link.
+              Enter your username. A reset link will be sent to your registered email address.
             </Typography>
           </Stack>
           {message ? (
@@ -52,15 +52,15 @@ export default function ForgotPasswordPage() {
               <Stack spacing={2}>
                 {error && <Alert severity="error">{error}</Alert>}
                 <TextField
-                  label="Email Address"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  label="Username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   fullWidth
                   required
                   autoFocus
+                  autoComplete="username"
                 />
-                <Button type="submit" variant="contained" size="large" disabled={loading}
+                <Button type="submit" variant="contained" size="large" disabled={loading || !username.trim()}
                   startIcon={loading ? <CircularProgress size={18} color="inherit" /> : null}>
                   {loading ? 'Sending...' : 'Send Reset Link'}
                 </Button>

@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Checkbox,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -14,6 +15,11 @@ import {
   OutlinedInput,
   Select,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
   TextField,
   Tooltip,
   Typography,
@@ -22,11 +28,12 @@ import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import HistoryIcon from '@mui/icons-material/History';
 import { adminApi } from '../../api/endpoints';
 import { extractErrorMessage } from '../../api/client';
 import { useNotification } from '../../context/NotificationContext';
 import { useAuth } from '../../context/AuthContext';
-import type { Company, Department, Role, UserAccount } from '../../types';
+import type { AuditLog, Company, Department, Role, UserAccount } from '../../types';
 
 interface FormState {
   id?: number;
@@ -57,6 +64,11 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY);
+
+  // History dialog
+  const [historyUser, setHistoryUser] = useState<UserAccount | null>(null);
+  const [history, setHistory] = useState<AuditLog[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -94,6 +106,17 @@ export default function UsersPage() {
     setOpen(true);
   };
 
+  const openHistory = async (u: UserAccount) => {
+    setHistoryUser(u);
+    setHistoryLoading(true);
+    try {
+      const data = await adminApi.getUserHistory(u.id, 0, 50);
+      setHistory(data.content);
+    } catch (err) {
+      notify(extractErrorMessage(err), 'error');
+    } finally { setHistoryLoading(false); }
+  };
+
   const save = async () => {
     try {
       const deptId = form.departmentId !== '' ? form.departmentId : null;
@@ -123,18 +146,39 @@ export default function UsersPage() {
     catch (err) { notify(extractErrorMessage(err), 'error'); }
   };
 
+  const fmtDate = (iso: string | null | undefined) =>
+    iso ? new Date(iso).toLocaleString() : '—';
+
   const columns: GridColDef<UserAccount>[] = [
     { field: 'username', headerName: 'Username', flex: 1 },
     { field: 'fullName', headerName: 'Full Name', flex: 1.2 },
     { field: 'email', headerName: 'Email', flex: 1.4 },
-    { field: 'companyName', headerName: 'Company', width: 150, valueGetter: (_v, row) => row.companyName ?? '—' },
+    { field: 'companyName', headerName: 'Company', width: 140, valueGetter: (_v, row) => row.companyName ?? '—' },
     { field: 'departmentName', headerName: 'Department', flex: 1, valueGetter: (_v, row) => row.departmentName ?? '—' },
     { field: 'roles', headerName: 'Roles', flex: 1.2, valueGetter: (_v, row) => row.roles.map((r) => r.name).join(', ') },
-    { field: 'active', headerName: 'Active', width: 80, valueGetter: (_v, row) => (row.active ? 'Yes' : 'No') },
     {
-      field: 'actions', headerName: 'Actions', width: 110, sortable: false,
+      field: 'active', headerName: 'Status', width: 100,
+      renderCell: (params) => (
+        <Chip
+          label={params.row.active ? 'Active' : 'Inactive'}
+          color={params.row.active ? 'success' : 'default'}
+          size="small"
+        />
+      ),
+    },
+    {
+      field: 'inactiveAt', headerName: 'Inactive Since', width: 170,
+      valueGetter: (_v, row) => row.inactiveAt ? new Date(row.inactiveAt).toLocaleString() : '',
+    },
+    {
+      field: 'actions', headerName: 'Actions', width: 130, sortable: false,
       renderCell: (params) => (
         <Stack direction="row">
+          <Tooltip title="History">
+            <IconButton size="small" onClick={() => openHistory(params.row)}>
+              <HistoryIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
           {hasPermission('ADMIN_UPDATE') && (
             <Tooltip title="Edit"><IconButton size="small" onClick={() => openEdit(params.row)}><EditIcon fontSize="small" /></IconButton></Tooltip>
           )}
@@ -163,6 +207,7 @@ export default function UsersPage() {
           pageSizeOptions={[10, 25, 50]} initialState={{ pagination: { paginationModel: { pageSize: 25 } } }} />
       </Box>
 
+      {/* Edit / Create dialog */}
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>{form.id ? 'Edit User' : 'New User'}</DialogTitle>
         <DialogContent>
@@ -179,7 +224,6 @@ export default function UsersPage() {
             <TextField label="Phone" value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })} />
 
-            {/* Company dropdown */}
             <TextField select label="Company *" value={form.companyId}
               onChange={(e) => setForm({ ...form, companyId: e.target.value !== '' ? Number(e.target.value) : '' })}
               required>
@@ -187,14 +231,12 @@ export default function UsersPage() {
               {companies.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </TextField>
 
-            {/* Department dropdown */}
             <TextField select label="Department" value={form.departmentId}
               onChange={(e) => setForm({ ...form, departmentId: e.target.value !== '' ? Number(e.target.value) : '' })}>
               <MenuItem value=""><em>None</em></MenuItem>
               {departments.map((d) => <MenuItem key={d.id} value={d.id}>{d.name}</MenuItem>)}
             </TextField>
 
-            {/* Roles multi-select */}
             <Select multiple value={form.roleIds}
               onChange={(e) => setForm({ ...form, roleIds: e.target.value as number[] })}
               input={<OutlinedInput label="Roles" />}
@@ -221,6 +263,44 @@ export default function UsersPage() {
         <DialogActions>
           <Button onClick={() => setOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={save}>Save</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* History dialog */}
+      <Dialog open={!!historyUser} onClose={() => setHistoryUser(null)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          Modification History — {historyUser?.fullName} ({historyUser?.username})
+        </DialogTitle>
+        <DialogContent>
+          {historyLoading ? (
+            <Typography>Loading…</Typography>
+          ) : history.length === 0 ? (
+            <Typography color="text.secondary">No history records found.</Typography>
+          ) : (
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Date / Time</TableCell>
+                  <TableCell>Action</TableCell>
+                  <TableCell>Performed By</TableCell>
+                  <TableCell>Details</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {history.map((h) => (
+                  <TableRow key={h.id}>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{fmtDate(h.createdAt)}</TableCell>
+                    <TableCell><Chip label={h.action} size="small" /></TableCell>
+                    <TableCell>{h.performedBy}</TableCell>
+                    <TableCell>{h.details ?? '—'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setHistoryUser(null)}>Close</Button>
         </DialogActions>
       </Dialog>
     </Stack>

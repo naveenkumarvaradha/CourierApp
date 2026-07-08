@@ -6,6 +6,7 @@ public record ApprovalRoutingRequest(
         Long creatorRoleId,
         Long creatorUserId,
         boolean active,
-        String module
+        String module,
+        int level
 ) {
 }

@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Controller, useForm } from 'react-hook-form';
 import {
   Alert,
+  Box,
   Button,
   Card,
   CardContent,
+  Chip,
+  Divider,
   Grid,
   MenuItem,
   Stack,
@@ -13,11 +16,12 @@ import {
   Typography,
 } from '@mui/material';
 import BusinessIcon from '@mui/icons-material/Business';
-import { adminApi, bookingApi, flexFieldApi, partyApi } from '../../api/endpoints';
+import { adminApi, approvalApi, bookingApi, flexFieldApi, partyApi } from '../../api/endpoints';
 import { extractErrorMessage } from '../../api/client';
 import { useNotification } from '../../context/NotificationContext';
+import { useAuth } from '../../context/AuthContext';
 import FlexFieldsSection from '../../components/FlexFieldsSection';
-import type { CompanySettings, CourierWay, FlexFieldValues, PackageType, Party } from '../../types';
+import type { ApprovalInfo, Booking, CompanySettings, CourierWay, FlexFieldValues, PackageType, Party } from '../../types';
 
 interface FormValues {
   receiverId: number | '';
@@ -28,6 +32,7 @@ interface FormValues {
   noOfPackages: number | '';
   courierMode: string;
   specialInstructions: string;
+  companyPoNo: string;
 }
 
 const DEFAULTS: FormValues = {
@@ -39,18 +44,44 @@ const DEFAULTS: FormValues = {
   noOfPackages: 1,
   courierMode: 'SURFACE',
   specialInstructions: '',
+  companyPoNo: '',
 };
+
+const STATUS_COLORS: Record<string, 'default' | 'info' | 'warning' | 'success' | 'error'> = {
+  BOOKED: 'info',
+  PENDING_APPROVAL: 'warning',
+  APPROVED: 'success',
+  IN_TRANSIT: 'info',
+  DELIVERED: 'success',
+  CANCELLED: 'default',
+  REJECTED: 'error',
+  PENDING_CANCELLATION: 'warning',
+};
+
+function ReadOnlyField({ label, value }: { label: string; value?: string | number | null }) {
+  return (
+    <Box>
+      <Typography variant="caption" color="text.secondary">{label}</Typography>
+      <Typography variant="body2" fontWeight={500}>{value ?? '—'}</Typography>
+    </Box>
+  );
+}
 
 export default function BookingFormPage() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const viewMode = searchParams.get('view') === '1';
   const navigate = useNavigate();
   const { notify } = useNotification();
+  const { user } = useAuth();
   const [parties, setParties] = useState<Party[]>([]);
   const [courierWays, setCourierWays] = useState<CourierWay[]>([]);
   const [packageTypes, setPackageTypes] = useState<PackageType[]>([]);
   const [company, setCompany] = useState<CompanySettings | null>(null);
   const [flexValues, setFlexValues] = useState<FlexFieldValues>({});
-  const isEdit = Boolean(id);
+  const [booking, setBooking] = useState<Booking | null>(null);
+  const [approvalInfo, setApprovalInfo] = useState<ApprovalInfo | null>(null);
+  const isEdit = Boolean(id) && !viewMode;
 
   const {
     control,
@@ -60,15 +91,24 @@ export default function BookingFormPage() {
   } = useForm<FormValues>({ defaultValues: DEFAULTS });
 
   useEffect(() => {
-    partyApi.listActive().then(setParties).catch(() => undefined);
+    // Exclude company-linked parties (partyCode starts with "COMPANY") from receiver dropdown
+    partyApi.listActive()
+      .then((list) => setParties(list.filter((p) => !p.partyCode.startsWith('COMPANY'))))
+      .catch(() => undefined);
     adminApi.listActiveCourierWays().then(setCourierWays).catch(() => undefined);
     adminApi.listActivePackageTypes().then(setPackageTypes).catch(() => undefined);
-    adminApi.getCompanySettings().then(setCompany).catch(() => undefined);
-  }, []);
+    // Load sender address from the logged-in user's own company
+    if (user?.companyId) {
+      adminApi.getCompanySettingsById(user.companyId).then(setCompany).catch(() => undefined);
+    } else {
+      adminApi.getCompanySettings().then(setCompany).catch(() => undefined);
+    }
+  }, [user?.companyId]);
 
   useEffect(() => {
     if (id) {
       bookingApi.get(Number(id)).then((b) => {
+        setBooking(b);
         reset({
           receiverId: b.receiver.id,
           courierWayId: b.courierWay?.id ?? '',
@@ -78,10 +118,14 @@ export default function BookingFormPage() {
           noOfPackages: b.noOfPackages,
           courierMode: b.courierMode,
           specialInstructions: b.specialInstructions ?? '',
+          companyPoNo: b.companyPoNo ?? '',
         });
         flexFieldApi.getValues('BOOKING', Number(id))
           .then((res) => setFlexValues(res.values ?? {}))
           .catch(() => undefined);
+        if (b.status === 'PENDING_APPROVAL') {
+          approvalApi.bookingInfo(Number(id)).then(setApprovalInfo).catch(() => undefined);
+        }
       }).catch((err) => notify(extractErrorMessage(err), 'error'));
     }
   }, [id, reset, notify]);
@@ -96,6 +140,7 @@ export default function BookingFormPage() {
       noOfPackages: Number(values.noOfPackages),
       courierMode: values.courierMode,
       specialInstructions: values.specialInstructions || null,
+      companyPoNo: values.companyPoNo || null,
     };
     try {
       let savedId: number;
@@ -117,6 +162,101 @@ export default function BookingFormPage() {
     }
   };
 
+  // ── View mode ─────────────────────────────────────────────────────────────
+  if (viewMode && booking) {
+    const r = booking.receiver;
+    return (
+      <Stack spacing={2}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Typography variant="h5" fontWeight={600}>Booking Detail</Typography>
+          <Button onClick={() => navigate('/bookings')}>Back</Button>
+        </Stack>
+
+        <Card>
+          <CardContent>
+            <Stack direction="row" spacing={2} alignItems="center" mb={2}>
+              <Typography variant="h6">{booking.bookingNumber}</Typography>
+              <Chip
+                size="small"
+                label={booking.status.replace(/_/g, ' ')}
+                color={STATUS_COLORS[booking.status] ?? 'default'}
+              />
+              {booking.awbNumber && (
+                <Chip size="small" label={`AWB: ${booking.awbNumber}`} color="primary" variant="outlined" />
+              )}
+              {booking.printTaken && (
+                <Chip size="small" label="Printed" color="success" variant="outlined" />
+              )}
+            </Stack>
+
+            <Divider sx={{ mb: 2 }} />
+
+            {/* FROM */}
+            <Typography variant="subtitle2" color="primary" gutterBottom>FROM (Sender / Company)</Typography>
+            <Grid container spacing={2} mb={2}>
+              <Grid item xs={6} sm={4}><ReadOnlyField label="Created By" value={booking.createdBy} /></Grid>
+              <Grid item xs={6} sm={4}><ReadOnlyField label="Company" value={company?.companyName} /></Grid>
+              <Grid item xs={6} sm={4}><ReadOnlyField label="Address" value={company ? `${company.addressLine1}, ${company.city}` : undefined} /></Grid>
+            </Grid>
+
+            <Divider sx={{ mb: 2 }} />
+
+            {/* TO */}
+            <Typography variant="subtitle2" color="primary" gutterBottom>TO (Receiver)</Typography>
+            <Grid container spacing={2} mb={2}>
+              <Grid item xs={6} sm={4}><ReadOnlyField label="Party Name" value={r.partyName} /></Grid>
+              <Grid item xs={6} sm={4}><ReadOnlyField label="Address Line 1" value={r.addressLine1} /></Grid>
+
+              <Grid item xs={6} sm={3}><ReadOnlyField label="City" value={r.city} /></Grid>
+              <Grid item xs={6} sm={3}><ReadOnlyField label="State" value={r.state} /></Grid>
+              <Grid item xs={6} sm={3}><ReadOnlyField label="Pincode" value={r.pincode} /></Grid>
+              <Grid item xs={6} sm={3}><ReadOnlyField label="Country" value={r.country} /></Grid>
+              <Grid item xs={6} sm={3}><ReadOnlyField label="Phone" value={r.phone} /></Grid>
+              <Grid item xs={6} sm={3}><ReadOnlyField label="Email" value={r.email} /></Grid>
+              <Grid item xs={6} sm={3}><ReadOnlyField label="GSTIN" value={r.gstin} /></Grid>
+            </Grid>
+
+            <Divider sx={{ mb: 2 }} />
+
+            {/* Shipment */}
+            <Typography variant="subtitle2" color="primary" gutterBottom>Shipment Details</Typography>
+            <Grid container spacing={2} mb={2}>
+              <Grid item xs={6} sm={3}><ReadOnlyField label="Date" value={booking.bookingDate} /></Grid>
+              <Grid item xs={6} sm={3}><ReadOnlyField label="Mode" value={booking.courierMode} /></Grid>
+              <Grid item xs={6} sm={3}><ReadOnlyField label="Courier Way" value={booking.courierWay?.name} /></Grid>
+              <Grid item xs={6} sm={3}><ReadOnlyField label="Package Type" value={booking.packageType?.name} /></Grid>
+              <Grid item xs={6} sm={3}><ReadOnlyField label="Weight (kg)" value={booking.weightKg} /></Grid>
+              <Grid item xs={6} sm={3}><ReadOnlyField label="No. of Packages" value={booking.noOfPackages} /></Grid>
+              <Grid item xs={12} sm={6}><ReadOnlyField label="Item Description" value={booking.itemDescription} /></Grid>
+            </Grid>
+
+            {booking.status === 'PENDING_APPROVAL' && approvalInfo && (
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                <strong>Pending Approval — {approvalInfo.summary}</strong>
+                {approvalInfo.approvers.length > 0 && (
+                  <Box mt={0.5}>
+                    Awaiting approval from: <strong>{approvalInfo.approvers.join(', ')}</strong>
+                  </Box>
+                )}
+              </Alert>
+            )}
+            {booking.approvalRemarks && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                <strong>Approval Remarks:</strong> {booking.approvalRemarks} — {booking.approverUsername}
+              </Alert>
+            )}
+            {booking.cancellationRemarks && (
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                <strong>Cancellation Remarks:</strong> {booking.cancellationRemarks}
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      </Stack>
+    );
+  }
+
+  // ── Create / Edit mode ────────────────────────────────────────────────────
   return (
     <Stack spacing={2}>
       <Typography variant="h5" fontWeight={600}>{isEdit ? 'Edit Booking' : 'New Booking'}</Typography>
@@ -158,9 +298,11 @@ export default function BookingFormPage() {
               </Grid>
               <Grid item xs={12} sm={4}>
                 <Controller name="packageTypeId" control={control}
+                  rules={{ required: 'Package type is required' }}
                   render={({ field }) => (
-                    <TextField {...field} select label="Package Type" fullWidth>
-                      <MenuItem value=""><em>None</em></MenuItem>
+                    <TextField {...field} select label="Package Type *" fullWidth
+                      error={!!errors.packageTypeId} helperText={errors.packageTypeId?.message}>
+                      <MenuItem value=""><em>Select</em></MenuItem>
                       {packageTypes.map((pt) => (
                         <MenuItem key={pt.id} value={pt.id}>{pt.name}</MenuItem>
                       ))}

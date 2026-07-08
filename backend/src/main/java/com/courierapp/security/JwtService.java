@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 
 @Service
@@ -32,6 +33,7 @@ public class JwtService {
     public String generateAccessToken(String username, Long userId, Long companyId, List<String> authorities) {
         Date now = new Date();
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .subject(username)
                 .claim("uid", userId)
                 .claim("cid", companyId)
@@ -46,6 +48,7 @@ public class JwtService {
     public String generateRefreshToken(String username, Long userId) {
         Date now = new Date();
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .subject(username)
                 .claim("uid", userId)
                 .claim("type", "refresh")
@@ -67,12 +70,28 @@ public class JwtService {
         return resolver.apply(parse(token));
     }
 
+    public String generateMfaPendingToken(String username, Long userId) {
+        Date now = new Date();
+        return Jwts.builder()
+                .subject(username)
+                .claim("uid", userId)
+                .claim("type", "mfa_pending")
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + 5 * 60_000L)) // 5-minute window to enter OTP
+                .signWith(key)
+                .compact();
+    }
+
     public boolean isAccessToken(Claims claims) {
         return "access".equals(claims.get("type", String.class));
     }
 
     public boolean isRefreshToken(Claims claims) {
         return "refresh".equals(claims.get("type", String.class));
+    }
+
+    public boolean isMfaPendingToken(Claims claims) {
+        return "mfa_pending".equals(claims.get("type", String.class));
     }
 
     public long getAccessExpirySeconds() {

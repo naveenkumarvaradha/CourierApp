@@ -2,6 +2,8 @@ package com.courierapp.service.impl;
 
 import com.courierapp.dto.PageResponse;
 import com.courierapp.dto.admin.*;
+
+import java.util.Optional;
 import com.courierapp.entity.ApprovalRouting;
 import com.courierapp.entity.Company;
 import com.courierapp.entity.CompanySettings;
@@ -11,6 +13,7 @@ import com.courierapp.entity.PackageType;
 import com.courierapp.entity.Party;
 import com.courierapp.entity.Permission;
 import com.courierapp.entity.Role;
+import com.courierapp.entity.StickerFieldConfig;
 import com.courierapp.entity.User;
 import com.courierapp.enums.PartyStatus;
 import com.courierapp.enums.PartyType;
@@ -34,10 +37,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+
+import static com.courierapp.config.CacheConfig.*;
 
 import java.util.Comparator;
 import java.util.HashSet;
@@ -63,6 +70,8 @@ public class AdminServiceImpl implements AdminService {
     private final PasswordEncoder passwordEncoder;
     private final PermissionMapper permissionMapper;
     private final AuditLogService auditLogService;
+    private final com.courierapp.repository.PasswordPolicyRepository passwordPolicyRepository;
+    private final com.courierapp.repository.StickerFieldConfigRepository stickerFieldConfigRepository;
 
     public AdminServiceImpl(UserRepository userRepository,
                             RoleRepository roleRepository,
@@ -76,7 +85,9 @@ public class AdminServiceImpl implements AdminService {
                             PartyRepository partyRepository,
                             PasswordEncoder passwordEncoder,
                             PermissionMapper permissionMapper,
-                            AuditLogService auditLogService) {
+                            AuditLogService auditLogService,
+                            com.courierapp.repository.PasswordPolicyRepository passwordPolicyRepository,
+                            com.courierapp.repository.StickerFieldConfigRepository stickerFieldConfigRepository) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.permissionRepository = permissionRepository;
@@ -90,6 +101,8 @@ public class AdminServiceImpl implements AdminService {
         this.passwordEncoder = passwordEncoder;
         this.permissionMapper = permissionMapper;
         this.auditLogService = auditLogService;
+        this.passwordPolicyRepository = passwordPolicyRepository;
+        this.stickerFieldConfigRepository = stickerFieldConfigRepository;
     }
 
     // ----- Permissions -----
@@ -188,9 +201,6 @@ public class AdminServiceImpl implements AdminService {
         if (userRepository.existsByUsername(request.username())) {
             throw new DuplicateResourceException("Username already exists: " + request.username());
         }
-        if (userRepository.existsByEmail(request.email())) {
-            throw new DuplicateResourceException("Email already exists: " + request.email());
-        }
         User user = new User();
         user.setUsername(request.username());
         user.setPasswordHash(passwordEncoder.encode(request.password()));
@@ -211,13 +221,29 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public UserResponse updateUser(Long id, UserUpdateRequest request) {
         User user = findUser(id);
-        if (!user.getEmail().equals(request.email()) && userRepository.existsByEmail(request.email())) {
-            throw new DuplicateResourceException("Email already exists: " + request.email());
-        }
         user.setFullName(request.fullName());
         user.setEmail(request.email());
         user.setPhone(request.phone());
+        boolean wasActive = user.isActive();
+        // Prevent deactivating the last active admin
+        if (wasActive && !request.active()) {
+            boolean userIsAdmin = user.getRoles().stream()
+                    .anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getName()));
+            if (userIsAdmin) {
+                long otherAdmins = userRepository.countActiveAdminsExcluding(user.getId());
+                if (otherAdmins == 0) {
+                    throw new BusinessException(
+                            "Cannot deactivate this user — they are the only active Admin. " +
+                            "Assign Admin role to another active user first.");
+                }
+            }
+        }
         user.setActive(request.active());
+        if (wasActive && !request.active()) {
+            user.setInactiveAt(java.time.Instant.now());
+        } else if (!wasActive && request.active()) {
+            user.setInactiveAt(null); // re-activated
+        }
         if (StringUtils.hasText(request.password())) {
             user.setPasswordHash(passwordEncoder.encode(request.password()));
             auditLogService.log("USER", "PASSWORD_CHANGE", user.getId(), user.getUsername(), "admin", null);
@@ -241,6 +267,39 @@ public class AdminServiceImpl implements AdminService {
         String username = user.getUsername();
         userRepository.delete(user);
         auditLogService.log("USER", "DELETE", id, username, "admin", null);
+    }
+
+    // ----- MFA admin management -----
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.courierapp.dto.PageResponse<com.courierapp.dto.admin.UserMfaStatusResponse> listUserMfaStatus(
+            String search, org.springframework.data.domain.Pageable pageable) {
+        org.springframework.data.domain.Page<User> page = StringUtils.hasText(search)
+                ? userRepository.findByUsernameContainingIgnoreCaseOrFullNameContainingIgnoreCase(search, search, pageable)
+                : userRepository.findAll(pageable);
+        return com.courierapp.dto.PageResponse.of(page.map(u -> new com.courierapp.dto.admin.UserMfaStatusResponse(
+                u.getId(), u.getUsername(), u.getFullName(), u.getEmail(),
+                u.isMfaEnabled(), u.getMfaSecret() != null)));
+    }
+
+    @Override
+    public void adminDisableMfa(Long userId) {
+        User user = findUser(userId);
+        user.setMfaEnabled(false);
+        userRepository.save(user);
+        auditLogService.log("AUTH", "MFA_DISABLED_BY_ADMIN", user.getId(), user.getUsername(), "admin", null);
+        log.info("Admin disabled MFA for user '{}'", user.getUsername());
+    }
+
+    @Override
+    public void adminResetMfa(Long userId) {
+        User user = findUser(userId);
+        user.setMfaEnabled(false);
+        user.setMfaSecret(null);
+        userRepository.save(user);
+        auditLogService.log("AUTH", "MFA_RESET_BY_ADMIN", user.getId(), user.getUsername(), "admin", null);
+        log.info("Admin reset MFA for user '{}'", user.getUsername());
     }
 
     // ----- Approval routing -----
@@ -303,6 +362,7 @@ public class AdminServiceImpl implements AdminService {
         routing.setCreatorUser(request.creatorUserId() != null ? findUser(request.creatorUserId()) : null);
         routing.setActive(request.active());
         routing.setModule(request.module() != null ? request.module().toUpperCase() : "BOOKING");
+        routing.setLevel(request.level() > 0 ? request.level() : 1);
     }
 
     // ----- Helpers -----
@@ -363,6 +423,7 @@ public class AdminServiceImpl implements AdminService {
         return new UserResponse(user.getId(), user.getUsername(), user.getFullName(), user.getEmail(),
                 user.getPhone(), user.isActive(), deptId, deptName, companyId, companyCode, companyName,
                 roles, directPerms,
+                user.getInactiveAt(),
                 user.getCreatedAt(), user.getCreatedBy(), user.getUpdatedAt(), user.getUpdatedBy());
     }
 
@@ -390,13 +451,15 @@ public class AdminServiceImpl implements AdminService {
                 r.getCreatorUser() != null ? r.getCreatorUser().getId() : null,
                 r.getCreatorUser() != null ? r.getCreatorUser().getUsername() : null,
                 r.isActive(),
-                r.getModule());
+                r.getModule(),
+                r.getLevel());
     }
 
     // ----- Company settings -----
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(CACHE_COMPANY_SETTINGS)
     public CompanySettingsResponse getCompanySettings() {
         CompanySettings s = companySettingsRepository.findAll().stream().findFirst()
                 .orElseThrow(() -> new BusinessException("Company settings not found"));
@@ -404,6 +467,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @CacheEvict(value = CACHE_COMPANY_SETTINGS, allEntries = true)
     public CompanySettingsResponse updateCompanySettings(CompanySettingsRequest req) {
         log.info("Updating company settings: name={}", req.companyName());
         CompanySettings s = companySettingsRepository.findAll().stream().findFirst()
@@ -418,6 +482,13 @@ public class AdminServiceImpl implements AdminService {
         s.setPhone(req.phone());
         s.setEmail(req.email());
         s.setGstin(req.gstin());
+        // SMTP config — only overwrite password if a new one is provided
+        if (req.smtpHost() != null) s.setSmtpHost(req.smtpHost());
+        if (req.smtpPort() != null) s.setSmtpPort(req.smtpPort());
+        if (req.smtpUsername() != null) s.setSmtpUsername(req.smtpUsername());
+        if (req.smtpPassword() != null && !req.smtpPassword().isBlank()) s.setSmtpPassword(req.smtpPassword());
+        if (req.smtpFromName() != null) s.setSmtpFromName(req.smtpFromName());
+        if (req.smtpTls() != null) s.setSmtpTls(req.smtpTls());
 
         // Upsert the linked company party so bookings always have a sender
         Party party = s.getLinkedParty() != null
@@ -448,15 +519,184 @@ public class AdminServiceImpl implements AdminService {
     }
 
     private CompanySettingsResponse toSettingsResponse(CompanySettings s) {
+        boolean smtpConfigured = s.getSmtpHost() != null && !s.getSmtpHost().isBlank()
+                && s.getSmtpUsername() != null && !s.getSmtpUsername().isBlank()
+                && s.getSmtpPassword() != null && !s.getSmtpPassword().isBlank();
         return new CompanySettingsResponse(s.getId(), s.getCompanyName(), s.getAddressLine1(),
                 s.getAddressLine2(), s.getCity(), s.getState(), s.getPincode(),
-                s.getCountry(), s.getPhone(), s.getEmail(), s.getGstin());
+                s.getCountry(), s.getPhone(), s.getEmail(), s.getGstin(),
+                s.getSmtpHost(), s.getSmtpPort(), s.getSmtpUsername(),
+                s.getSmtpFromName(), s.getSmtpTls(), smtpConfigured);
+    }
+
+    // ----- Mail configuration (global) -----
+
+    @Override
+    @Transactional(readOnly = true)
+    public MailConfigResponse getMailConfig() {
+        CompanySettings s = companySettingsRepository.findAll().stream().findFirst().orElse(new CompanySettings());
+        boolean configured = s.getSmtpHost() != null && !s.getSmtpHost().isBlank()
+                && s.getSmtpUsername() != null && !s.getSmtpUsername().isBlank()
+                && s.getSmtpPassword() != null && !s.getSmtpPassword().isBlank();
+        return new MailConfigResponse(s.getSmtpHost(), s.getSmtpPort(), s.getSmtpUsername(),
+                s.getSmtpFromName(), s.getSmtpTls(), configured);
+    }
+
+    @Override
+    public MailConfigResponse saveMailConfig(MailConfigRequest req) {
+        CompanySettings s = companySettingsRepository.findAll().stream().findFirst()
+                .orElse(new CompanySettings());
+        if (req.smtpHost() != null) s.setSmtpHost(req.smtpHost());
+        if (req.smtpPort() != null) s.setSmtpPort(req.smtpPort());
+        if (req.smtpUsername() != null) s.setSmtpUsername(req.smtpUsername());
+        if (req.smtpPassword() != null && !req.smtpPassword().isBlank()) s.setSmtpPassword(req.smtpPassword());
+        if (req.smtpFromName() != null) s.setSmtpFromName(req.smtpFromName());
+        if (req.smtpTls() != null) s.setSmtpTls(req.smtpTls());
+        CompanySettings saved = companySettingsRepository.save(s);
+        log.info("Mail config updated: host={} user={}", saved.getSmtpHost(), saved.getSmtpUsername());
+        boolean configured = saved.getSmtpHost() != null && !saved.getSmtpHost().isBlank()
+                && saved.getSmtpUsername() != null && !saved.getSmtpUsername().isBlank()
+                && saved.getSmtpPassword() != null && !saved.getSmtpPassword().isBlank();
+        return new MailConfigResponse(saved.getSmtpHost(), saved.getSmtpPort(), saved.getSmtpUsername(),
+                saved.getSmtpFromName(), saved.getSmtpTls(), configured);
+    }
+
+    // ----- Company logo -----
+
+    @Override
+    public void saveCompanyLogo(Long companyId, byte[] data, String contentType) {
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Company", companyId));
+        CompanySettings s = companySettingsRepository.findByCompanyId(companyId)
+                .orElseGet(() -> { CompanySettings n = new CompanySettings(); n.setCompany(company); return n; });
+        s.setLogoData(data);
+        s.setLogoContentType(contentType);
+        companySettingsRepository.save(s);
+        log.info("Logo saved for company {}, size={} bytes", companyId, data.length);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<LogoDto> getCompanyLogo(Long companyId) {
+        return companySettingsRepository.findByCompanyId(companyId)
+                .filter(s -> s.getLogoData() != null && s.getLogoData().length > 0)
+                .map(s -> new LogoDto(s.getLogoData(), s.getLogoContentType()));
+    }
+
+    @Override
+    public void deleteCompanyLogo(Long companyId) {
+        companySettingsRepository.findByCompanyId(companyId).ifPresent(s -> {
+            s.setLogoData(null);
+            s.setLogoContentType(null);
+            companySettingsRepository.save(s);
+        });
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CompanySettingsResponse getCompanySettingsByCompanyId(Long companyId) {
+        CompanySettings s = companySettingsRepository.findByCompanyId(companyId)
+                .orElse(new CompanySettings()); // empty if not yet configured
+        return toSettingsResponse(s);
+    }
+
+    @Override
+    public CompanySettingsResponse updateCompanySettingsByCompanyId(Long companyId, CompanySettingsRequest req) {
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Company", companyId));
+        CompanySettings s = companySettingsRepository.findByCompanyId(companyId)
+                .orElse(new CompanySettings());
+        s.setCompany(company);
+        s.setCompanyName(req.companyName());
+        s.setAddressLine1(req.addressLine1());
+        s.setAddressLine2(req.addressLine2());
+        s.setCity(req.city());
+        s.setState(req.state());
+        s.setPincode(req.pincode());
+        s.setCountry(req.country());
+        s.setPhone(req.phone());
+        s.setEmail(req.email());
+        s.setGstin(req.gstin());
+        if (req.smtpHost() != null) s.setSmtpHost(req.smtpHost());
+        if (req.smtpPort() != null) s.setSmtpPort(req.smtpPort());
+        if (req.smtpUsername() != null) s.setSmtpUsername(req.smtpUsername());
+        if (req.smtpPassword() != null && !req.smtpPassword().isBlank()) s.setSmtpPassword(req.smtpPassword());
+        if (req.smtpFromName() != null) s.setSmtpFromName(req.smtpFromName());
+        if (req.smtpTls() != null) s.setSmtpTls(req.smtpTls());
+        // Upsert the linked company party (sender)
+        Party party = s.getLinkedParty() != null
+                ? s.getLinkedParty()
+                : partyRepository.findByPartyCode("COMPANY" + companyId).orElse(new Party());
+        party.setPartyCode("COMPANY" + companyId);
+        party.setPartyName(req.companyName());
+        party.setAddressLine1(req.addressLine1());
+        party.setAddressLine2(req.addressLine2());
+        party.setCity(req.city());
+        party.setState(req.state());
+        party.setPincode(req.pincode());
+        party.setCountry(req.country());
+        party.setPhone(req.phone());
+        party.setEmail(req.email());
+        party.setGstin(req.gstin());
+        party.setPartyType(PartyType.SENDER);
+        party.setActive(true);
+        party.setPartyStatus(PartyStatus.ACTIVE);
+        Party savedParty = partyRepository.save(party);
+        s.setLinkedParty(savedParty);
+        CompanySettings saved = companySettingsRepository.save(s);
+        log.info("Company settings updated for company id={}", companyId);
+        return toSettingsResponse(saved);
+    }
+
+    // ----- Password policy -----
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.courierapp.dto.admin.PasswordPolicyResponse getPasswordPolicy() {
+        com.courierapp.entity.PasswordPolicy p = passwordPolicyRepository.findAll().stream().findFirst()
+                .orElse(defaultPolicy());
+        return toPolicyResponse(p);
+    }
+
+    @Override
+    public com.courierapp.dto.admin.PasswordPolicyResponse updatePasswordPolicy(
+            com.courierapp.dto.admin.PasswordPolicyRequest req) {
+        com.courierapp.entity.PasswordPolicy p = passwordPolicyRepository.findAll().stream().findFirst()
+                .orElse(new com.courierapp.entity.PasswordPolicy());
+        p.setRestrictLastPasswords(req.restrictLastPasswords());
+        p.setPasswordExpiryDays(req.passwordExpiryDays());
+        p.setExpiryReminderDays(req.expiryReminderDays());
+        p.setSessionTimeoutHours(req.sessionTimeoutHours());
+        p.setSessionTimeoutMinutes(req.sessionTimeoutMinutes());
+        p.setMaxLoginAttempts(req.maxLoginAttempts());
+        p.setMinPasswordLength(req.minPasswordLength());
+        p.setRequireUppercase(req.requireUppercase());
+        p.setRequireLowercase(req.requireLowercase());
+        p.setRequireDigit(req.requireDigit());
+        p.setRequireSpecialChar(req.requireSpecialChar());
+        return toPolicyResponse(passwordPolicyRepository.save(p));
+    }
+
+    private com.courierapp.entity.PasswordPolicy defaultPolicy() {
+        com.courierapp.entity.PasswordPolicy p = new com.courierapp.entity.PasswordPolicy();
+        return p;
+    }
+
+    private com.courierapp.dto.admin.PasswordPolicyResponse toPolicyResponse(
+            com.courierapp.entity.PasswordPolicy p) {
+        return new com.courierapp.dto.admin.PasswordPolicyResponse(
+                p.getId(),
+                p.getRestrictLastPasswords(), p.getPasswordExpiryDays(), p.getExpiryReminderDays(),
+                p.getSessionTimeoutHours(), p.getSessionTimeoutMinutes(), p.getMaxLoginAttempts(),
+                p.getMinPasswordLength(), p.isRequireUppercase(), p.isRequireLowercase(),
+                p.isRequireDigit(), p.isRequireSpecialChar());
     }
 
     // ----- Courier ways -----
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(CACHE_COURIER_WAYS)
     public List<CourierWayResponse> listCourierWays() {
         return courierWayRepository.findAll().stream()
                 .map(this::toCourierWayResponse).toList();
@@ -464,12 +704,14 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CACHE_COURIER_WAYS, key = "'active'")
     public List<CourierWayResponse> listActiveCourierWays() {
         return courierWayRepository.findByActiveTrueOrderByNameAsc().stream()
                 .map(this::toCourierWayResponse).toList();
     }
 
     @Override
+    @CacheEvict(value = CACHE_COURIER_WAYS, allEntries = true)
     public CourierWayResponse createCourierWay(CourierWayRequest req) {
         log.info("Creating courier way: name={}", req.name());
         if (courierWayRepository.existsByNameIgnoreCase(req.name())) {
@@ -485,6 +727,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @CacheEvict(value = CACHE_COURIER_WAYS, allEntries = true)
     public CourierWayResponse updateCourierWay(Long id, CourierWayRequest req) {
         log.info("Updating courier way id={}: name={}", id, req.name());
         CourierWay cw = courierWayRepository.findById(id)
@@ -502,6 +745,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @CacheEvict(value = CACHE_COURIER_WAYS, allEntries = true)
     public void deleteCourierWay(Long id) {
         log.info("Deleting courier way id={}", id);
         CourierWay cw = courierWayRepository.findById(id)
@@ -519,6 +763,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(CACHE_PACKAGE_TYPES)
     public List<PackageTypeResponse> listPackageTypes() {
         return packageTypeRepository.findAll().stream()
                 .map(this::toPackageTypeResponse).toList();
@@ -526,12 +771,14 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CACHE_PACKAGE_TYPES, key = "'active'")
     public List<PackageTypeResponse> listActivePackageTypes() {
         return packageTypeRepository.findByActiveTrueOrderByNameAsc().stream()
                 .map(this::toPackageTypeResponse).toList();
     }
 
     @Override
+    @CacheEvict(value = CACHE_PACKAGE_TYPES, allEntries = true)
     public PackageTypeResponse createPackageType(PackageTypeRequest req) {
         log.info("Creating package type: name={}", req.name());
         if (packageTypeRepository.existsByNameIgnoreCase(req.name())) {
@@ -547,6 +794,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @CacheEvict(value = CACHE_PACKAGE_TYPES, allEntries = true)
     public PackageTypeResponse updatePackageType(Long id, PackageTypeRequest req) {
         log.info("Updating package type id={}: name={}", id, req.name());
         PackageType pt = packageTypeRepository.findById(id)
@@ -564,6 +812,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @CacheEvict(value = CACHE_PACKAGE_TYPES, allEntries = true)
     public void deletePackageType(Long id) {
         log.info("Deleting package type id={}", id);
         PackageType pt = packageTypeRepository.findById(id)
@@ -581,17 +830,20 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(CACHE_DEPARTMENTS)
     public List<DepartmentResponse> listDepartments() {
         return departmentRepository.findAll().stream().map(this::toDeptResponse).toList();
     }
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CACHE_DEPARTMENTS, key = "'active'")
     public List<DepartmentResponse> listActiveDepartments() {
         return departmentRepository.findByActiveTrueOrderByNameAsc().stream().map(this::toDeptResponse).toList();
     }
 
     @Override
+    @CacheEvict(value = CACHE_DEPARTMENTS, allEntries = true)
     public DepartmentResponse createDepartment(DepartmentRequest req) {
         log.info("Creating department: name={}", req.name());
         if (departmentRepository.existsByNameIgnoreCase(req.name())) {
@@ -606,6 +858,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @CacheEvict(value = CACHE_DEPARTMENTS, allEntries = true)
     public DepartmentResponse updateDepartment(Long id, DepartmentRequest req) {
         log.info("Updating department id={}", id);
         Department d = departmentRepository.findById(id)
@@ -622,6 +875,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @CacheEvict(value = CACHE_DEPARTMENTS, allEntries = true)
     public void deleteDepartment(Long id) {
         log.info("Deleting department id={}", id);
         Department d = departmentRepository.findById(id)
@@ -651,21 +905,30 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public CompanyResponse createCompany(CompanyRequest req) {
-        log.info("Creating company: code={}, name={}", req.companyCode(), req.name());
-        if (companyRepository.existsByCompanyCodeIgnoreCase(req.companyCode())) {
-            throw new BusinessException("Company code '" + req.companyCode() + "' already exists");
-        }
+        log.info("Creating company: name={}", req.name());
         if (companyRepository.existsByNameIgnoreCase(req.name())) {
             throw new BusinessException("Company name '" + req.name() + "' already exists");
         }
+        // Auto-generate sequential numeric code: 1, 2, 3 ...
+        String code = nextCompanyCode();
         Company c = Company.builder()
-                .companyCode(req.companyCode().toUpperCase())
+                .companyCode(code)
                 .name(req.name())
                 .active(req.active())
                 .build();
         Company saved = companyRepository.save(c);
         auditLogService.log("COMPANY", "CREATE", saved.getId(), saved.getCompanyCode() + " " + saved.getName(), "admin", null);
         return toCompanyResponse(saved);
+    }
+
+    private String nextCompanyCode() {
+        long max = companyRepository.findAll().stream()
+                .map(Company::getCompanyCode)
+                .filter(code -> code != null && code.matches("\\d+"))
+                .mapToLong(Long::parseLong)
+                .max()
+                .orElse(0L);
+        return String.valueOf(max + 1);
     }
 
     @Override
@@ -702,5 +965,92 @@ public class AdminServiceImpl implements AdminService {
 
     private CompanyResponse toCompanyResponse(Company c) {
         return new CompanyResponse(c.getId(), c.getCompanyCode(), c.getName(), c.isActive());
+    }
+
+    // ----- Sticker field config -----
+
+    // Ordered list of all configurable sticker fields.
+    // Layout: HEADER (centered: Shipping Label + Company Name)
+    // Sticker layout (top → bottom):
+    //   HEADER       — centered: "COURIER SHIPPING LABEL" + Company Name
+    //   DETAILS_LEFT — Booking No + Courier Mode
+    //   DETAILS_RIGHT— Date + Weight (top-right)
+    //   FROM         — Creator Name → Mobile → Company Name → Address
+    //   TO           — Company / Name (large) / Address / Phone / GSTIN
+    //   BOTTOM       — AWB Number (large, full width)
+    private static final List<StickerFieldDto> DEFAULT_FIELDS = List.of(
+        // ── Header (centered) ──
+        new StickerFieldDto("SHIPPING_LABEL",  "Courier Shipping Label", true,  1,  "HEADER"),
+        new StickerFieldDto("COMPANY_NAME",    "Company Name",           true,  2,  "HEADER"),
+        // ── Details left column ──
+        new StickerFieldDto("BOOKING_NUMBER",  "Booking Number",         true,  3,  "DETAILS_LEFT"),
+        new StickerFieldDto("COURIER_MODE",    "Courier Mode / Via",     true,  4,  "DETAILS_LEFT"),
+        // ── Details right column (Date / Weight) ──
+        new StickerFieldDto("DETAIL_DATE",     "Date",                   true,  5,  "DETAILS_RIGHT"),
+        new StickerFieldDto("DETAIL_WEIGHT",   "Weight",                 true,  6,  "DETAILS_RIGHT"),
+        new StickerFieldDto("DETAIL_PACKAGES", "No. of Packages",        false, 7,  "DETAILS_RIGHT"),
+        new StickerFieldDto("DETAIL_PKG_TYPE", "Package Type",           false, 8,  "DETAILS_RIGHT"),
+        // ── FROM (Sender) — Creator first, then company ──
+        new StickerFieldDto("FROM_NAME",       "Creator Name",           true,  9,  "FROM"),
+        new StickerFieldDto("FROM_PHONE",      "Creator Mobile",         true,  10, "FROM"),
+        new StickerFieldDto("SENDER_COMPANY",  "Sender Company",         true,  11, "FROM"),
+        new StickerFieldDto("FROM_ADDRESS",    "Sender Address",         true,  12, "FROM"),
+        // ── TO (Receiver) ──
+        new StickerFieldDto("TO_COMPANY",      "Receiver Company",       true,  13, "TO"),
+        new StickerFieldDto("TO_NAME",         "Receiver Name",          true,  14, "TO"),
+        new StickerFieldDto("TO_ADDRESS",      "Receiver Address",       true,  15, "TO"),
+        new StickerFieldDto("TO_PHONE",        "Receiver Phone",         true,  16, "TO"),
+        new StickerFieldDto("TO_GSTIN",        "Receiver GSTIN",         false, 17, "TO"),
+        // ── Bottom — AWB Number (large, full width) ──
+        new StickerFieldDto("AWB_NUMBER",      "AWB Number",             true,  18, "BOTTOM")
+    );
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StickerFieldDto> getStickerFieldConfig(Long companyId) {
+        List<StickerFieldConfig> saved = stickerFieldConfigRepository.findByCompanyIdOrderBySortOrder(companyId);
+        if (saved.isEmpty()) {
+            return DEFAULT_FIELDS;
+        }
+        var savedKeys = saved.stream().map(StickerFieldConfig::getFieldKey).collect(java.util.stream.Collectors.toSet());
+        List<StickerFieldDto> result = new java.util.ArrayList<>(
+            saved.stream().map(s -> {
+                // Use DB-persisted section; fall back to default only for legacy rows with no section
+                String section = (s.getSection() != null && !s.getSection().isBlank())
+                    ? s.getSection()
+                    : DEFAULT_FIELDS.stream()
+                        .filter(d -> d.fieldKey().equals(s.getFieldKey()))
+                        .map(StickerFieldDto::section).findFirst().orElse("BOTTOM");
+                return new StickerFieldDto(s.getFieldKey(), s.getLabel(), s.isVisible(), s.getSortOrder(), section);
+            }).toList()
+        );
+        int maxOrder = result.stream().mapToInt(StickerFieldDto::sortOrder).max().orElse(0);
+        for (StickerFieldDto def : DEFAULT_FIELDS) {
+            if (!savedKeys.contains(def.fieldKey())) {
+                result.add(new StickerFieldDto(def.fieldKey(), def.label(), def.visible(), ++maxOrder, def.section()));
+            }
+        }
+        return result;
+    }
+
+    @Override
+    public List<StickerFieldDto> saveStickerFieldConfig(Long companyId, List<StickerFieldDto> fields) {
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Company", companyId));
+        stickerFieldConfigRepository.deleteByCompanyId(companyId);
+        stickerFieldConfigRepository.flush();
+        List<StickerFieldConfig> entities = new java.util.ArrayList<>();
+        for (StickerFieldDto dto : fields) {
+            StickerFieldConfig cfg = new StickerFieldConfig();
+            cfg.setCompany(company);
+            cfg.setFieldKey(dto.fieldKey());
+            cfg.setLabel(dto.label());
+            cfg.setVisible(dto.visible());
+            cfg.setSortOrder(dto.sortOrder());
+            cfg.setSection(dto.section() != null ? dto.section() : "BOTTOM");
+            entities.add(cfg);
+        }
+        stickerFieldConfigRepository.saveAll(entities);
+        return getStickerFieldConfig(companyId);
     }
 }

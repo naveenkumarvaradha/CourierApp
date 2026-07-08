@@ -3,6 +3,8 @@ package com.courierapp.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.Arrays;
+
 @Entity
 @Table(name = "company_settings")
 @Getter
@@ -46,8 +48,38 @@ public class CompanySettings extends Auditable {
     @Column(name = "gstin", length = 20)
     private String gstin;
 
+    // ── SMTP mail config (optional — falls back to application.yml if null) ──
+    @Column(name = "smtp_host", length = 200)
+    private String smtpHost;
+
+    @Column(name = "smtp_port")
+    private Integer smtpPort;
+
+    @Column(name = "smtp_username", length = 200)
+    private String smtpUsername;
+
+    @Column(name = "smtp_password", length = 500)
+    private String smtpPassword;
+
+    @Column(name = "smtp_from_name", length = 100)
+    private String smtpFromName;
+
+    @Column(name = "smtp_tls")
+    private Boolean smtpTls;
+
+    // ── Company logo ──
+    @Column(name = "logo_data", columnDefinition = "BYTEA")
+    private byte[] logoData;
+
+    @Column(name = "logo_content_type", length = 100)
+    private String logoContentType;
+
     /** The party record that mirrors this company — used as the sender on every booking. */
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "linked_party_id")
     private Party linkedParty;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "company_id")
+    private Company company;
 }

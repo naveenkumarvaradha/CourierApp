@@ -41,4 +41,8 @@ public class ApprovalRouting extends Auditable {
     /** BOOKING or MASTER — scopes this rule to a specific workflow. */
     @Column(name = "module", nullable = false, length = 30)
     private String module = "BOOKING";
+
+    /** Approval level (1 = first, 2 = second, …). Bookings/parties move through levels in order. */
+    @Column(name = "level", nullable = false)
+    private int level = 1;
 }

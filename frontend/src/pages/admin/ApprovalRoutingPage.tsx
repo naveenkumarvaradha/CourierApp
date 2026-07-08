@@ -13,6 +13,7 @@ import {
   MenuItem,
   Select,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
@@ -45,6 +46,9 @@ export default function ApprovalRoutingPage() {
   // Module scope
   const [module, setModule] = useState<Module>('BOOKING');
 
+  // Level
+  const [level, setLevel] = useState<number>(1);
+
   // Approver
   const [approverKind, setApproverKind] = useState<ApproverKind>('ROLE');
   const [approverId, setApproverId] = useState<number | ''>('');
@@ -76,6 +80,7 @@ export default function ApprovalRoutingPage() {
     setCreatorUserId('');
     setApproverKind('ROLE');
     setApproverId('');
+    setLevel(1);
   };
 
   const save = async () => {
@@ -99,6 +104,7 @@ export default function ApprovalRoutingPage() {
         creatorUserId: creatorKind === 'USER' ? Number(creatorUserId) : null,
         active: true,
         module,
+        level,
       });
       notify('Approval routing rule added', 'success');
       setOpen(false);
@@ -161,6 +167,14 @@ export default function ApprovalRoutingPage() {
           </Stack>
         );
       },
+    },
+    {
+      field: 'level',
+      headerName: 'Level',
+      width: 80,
+      renderCell: (p) => (
+        <Chip size="small" label={`L${p.row.level ?? 1}`} color="default" variant="outlined" />
+      ),
     },
     {
       field: 'active',
@@ -318,6 +332,18 @@ export default function ApprovalRoutingPage() {
                     ))}
               </Select>
             </FormControl>
+
+            {/* ── Approval Level ── */}
+            <TextField
+              label="Approval Level"
+              type="number"
+              size="small"
+              fullWidth
+              value={level}
+              onChange={(e) => setLevel(Math.max(1, Number(e.target.value)))}
+              inputProps={{ min: 1 }}
+              helperText="Level 1 = first approver, Level 2 = second approver after Level 1 approves, etc."
+            />
           </Stack>
         </DialogContent>
         <DialogActions>

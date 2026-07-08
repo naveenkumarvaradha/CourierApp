@@ -17,6 +17,7 @@ public record UserResponse(
         String companyName,
         List<RoleSummary> roles,
         List<PermissionResponse> directPermissions,
+        Instant inactiveAt,
         Instant createdAt,
         String createdBy,
         Instant updatedAt,

@@ -13,5 +13,12 @@ public record CompanySettingsRequest(
         @NotBlank @Size(max = 100) String country,
         @Size(max = 30)  String phone,
         @Size(max = 150) String email,
-        @Size(max = 20)  String gstin
+        @Size(max = 20)  String gstin,
+        // SMTP mail config
+        String smtpHost,
+        Integer smtpPort,
+        String smtpUsername,
+        String smtpPassword,
+        String smtpFromName,
+        Boolean smtpTls
 ) {}

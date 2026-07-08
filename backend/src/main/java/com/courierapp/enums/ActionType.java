@@ -5,5 +5,7 @@ public enum ActionType {
     VIEW,
     UPDATE,
     DELETE,
-    APPROVE
+    APPROVE,
+    PRINT,
+    REVISE
 }

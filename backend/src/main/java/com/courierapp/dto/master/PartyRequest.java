@@ -44,6 +44,9 @@ public record PartyRequest(
         @NotNull(message = "Party type is required")
         PartyType partyType,
 
-        boolean active
+        boolean active,
+
+        @Size(max = 255)
+        String companyName
 ) {
 }

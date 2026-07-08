@@ -13,23 +13,23 @@ import java.time.format.DateTimeFormatter;
 @Service
 public class BookingNumberGenerator {
 
-    private static final DateTimeFormatter KEY_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private static final DateTimeFormatter KEY_FMT = DateTimeFormatter.ofPattern("yyyy");
 
     private final BookingSequenceRepository sequenceRepository;
-    private final String prefix;
+    private final String basePrefix;
 
     public BookingNumberGenerator(BookingSequenceRepository sequenceRepository,
-                                  @Value("${app.booking.number-prefix:CB}") String prefix) {
+                                  @Value("${app.booking.number-prefix:CB}") String basePrefix) {
         this.sequenceRepository = sequenceRepository;
-        this.prefix = prefix;
+        this.basePrefix = basePrefix;
     }
 
     /**
-     * Generates the next booking number in the form PREFIX-YYYYMMDD-NNNNN.
-     * Uses a row-locked per-day counter so concurrent bookings get unique numbers.
+     * Generates the next booking number: C{companyCode}-CB-YYYYMMDD-NNNNN
+     * e.g. C1-CB-20260701-00001
      */
     @Transactional(propagation = Propagation.MANDATORY)
-    public String next(LocalDate date) {
+    public String next(LocalDate date, String companyCode) {
         String key = date.format(KEY_FMT);
         BookingSequence seq = sequenceRepository.findBySeqDate(key)
                 .orElseGet(() -> {
@@ -41,6 +41,7 @@ public class BookingNumberGenerator {
         long value = seq.getLastValue() + 1;
         seq.setLastValue(value);
         sequenceRepository.saveAndFlush(seq);
-        return String.format("%s-%s-%05d", prefix, key, value);
+        String companyPart = (companyCode != null && !companyCode.isBlank()) ? "C" + companyCode + "-" : "";
+        return String.format("%s%s-%s-%05d", companyPart, basePrefix, key, value);
     }
 }
