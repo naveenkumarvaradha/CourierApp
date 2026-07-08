@@ -49,6 +49,7 @@ export interface CurrentUser {
   companyName: string | null;
   roles: string[];
   permissions: string[];
+  mfaEnabled: boolean;
 }
 
 export interface PageResponse<T> {

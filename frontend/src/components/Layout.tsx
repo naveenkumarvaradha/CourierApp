@@ -202,10 +202,12 @@ export default function Layout() {
           <ListItemIcon sx={{ minWidth: 36 }}><LockIcon fontSize="small" /></ListItemIcon>
           <ListItemText primary="Change Password" primaryTypographyProps={{ fontSize: 13 }} />
         </ListItemButton>
-        <ListItemButton onClick={() => { setDrawerOpen(false); navigate('/profile/mfa'); }} sx={{ mx: 1.5, borderRadius: 2 }}>
-          <ListItemIcon sx={{ minWidth: 36 }}><PhonelinkLockIcon fontSize="small" /></ListItemIcon>
-          <ListItemText primary="Two-Factor Auth" primaryTypographyProps={{ fontSize: 13 }} />
-        </ListItemButton>
+        {user?.mfaEnabled && (
+          <ListItemButton onClick={() => { setDrawerOpen(false); navigate('/profile/mfa'); }} sx={{ mx: 1.5, borderRadius: 2 }}>
+            <ListItemIcon sx={{ minWidth: 36 }}><PhonelinkLockIcon fontSize="small" /></ListItemIcon>
+            <ListItemText primary="Two-Factor Auth" primaryTypographyProps={{ fontSize: 13 }} />
+          </ListItemButton>
+        )}
         <ListItemButton onClick={() => { setDrawerOpen(false); logout(); }} sx={{ mx: 1.5, borderRadius: 2, color: 'error.main' }}>
           <ListItemIcon sx={{ minWidth: 36, color: 'error.main' }}><LogoutIcon fontSize="small" /></ListItemIcon>
           <ListItemText primary="Sign Out" primaryTypographyProps={{ fontSize: 13 }} />
@@ -427,13 +429,15 @@ export default function Layout() {
               <PersonIcon fontSize="small" sx={{ color: 'text.secondary' }} />
               Change Password
             </MenuItem>
-            <MenuItem
-              onClick={() => { setUserAnchor(null); navigate('/profile/mfa'); }}
-              sx={{ borderRadius: 2, gap: 1.5, py: 1, px: 1.5, fontSize: 13.5 }}
-            >
-              <PhonelinkLockIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-              Two-Factor Auth (MFA)
-            </MenuItem>
+            {user?.mfaEnabled && (
+              <MenuItem
+                onClick={() => { setUserAnchor(null); navigate('/profile/mfa'); }}
+                sx={{ borderRadius: 2, gap: 1.5, py: 1, px: 1.5, fontSize: 13.5 }}
+              >
+                <PhonelinkLockIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                Two-Factor Auth (MFA)
+              </MenuItem>
+            )}
 
             <Divider sx={{ my: 0.5 }} />
 

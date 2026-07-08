@@ -124,9 +124,6 @@ export default function LoginPage() {
           >
             ShipDesk
           </Typography>
-          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.65)', fontWeight: 500 }}>
-            Enterprise Courier Management
-          </Typography>
         </Box>
 
         {/* Form section */}
@@ -234,7 +231,7 @@ export default function LoginPage() {
         {/* Footer */}
         <Box sx={{ bgcolor: 'grey.50', px: 4, py: 1.75, textAlign: 'center' }}>
           <Typography variant="caption" color="text.disabled" sx={{ fontSize: 11 }}>
-            © {new Date().getFullYear()} ShipDesk · Secure Enterprise Login
+            © {new Date().getFullYear()} ShipDesk
           </Typography>
         </Box>
       </Paper>

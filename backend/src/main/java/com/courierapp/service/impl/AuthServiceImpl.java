@@ -180,7 +180,8 @@ public class AuthServiceImpl implements AuthService {
                 company != null ? company.getId() : null,
                 company != null ? company.getCompanyCode() : null,
                 company != null ? company.getName() : null,
-                roles, permissions);
+                roles, permissions,
+                user.isMfaEnabled() && user.getMfaSecret() != null);
     }
 
     @Override
