@@ -16,10 +16,8 @@ RUN npm run build
 # ── Stage 2: Serve with Nginx ─────────────────────────────────────────────
 FROM nginx:1.27-alpine AS runtime
 COPY --from=build /app/dist /usr/share/nginx/html
-# Processed by the base image's entrypoint (envsubst on *.template files) at
-# container startup, substituting ${API_UPSTREAM} from the container env.
-COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 80 443
-HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://localhost/healthz || exit 1
+EXPOSE 80
+HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://localhost/ || exit 1
 CMD ["nginx", "-g", "daemon off;"]

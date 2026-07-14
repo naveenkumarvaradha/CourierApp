@@ -15,8 +15,6 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
-    private static final long MFA_PENDING_EXPIRY_MS = 5 * 60_000L; // 5-minute window to enter OTP
-
     private final SecretKey key;
     private final long accessExpiryMs;
     private final long refreshExpiryMs;
@@ -75,7 +73,7 @@ public class JwtService {
                 .claim("uid", userId)
                 .claim("type", "mfa_pending")
                 .issuedAt(now)
-                .expiration(new Date(now.getTime() + MFA_PENDING_EXPIRY_MS))
+                .expiration(new Date(now.getTime() + 5 * 60_000L)) // 5-minute window to enter OTP
                 .signWith(key)
                 .compact();
     }
@@ -94,14 +92,6 @@ public class JwtService {
 
     public long getAccessExpirySeconds() {
         return accessExpiryMs / 1000L;
-    }
-
-    public long getRefreshExpirySeconds() {
-        return refreshExpiryMs / 1000L;
-    }
-
-    public long getMfaPendingExpirySeconds() {
-        return MFA_PENDING_EXPIRY_MS / 1000L;
     }
 
     @SuppressWarnings("unchecked")

@@ -1,6 +1,5 @@
 # Backend
 backend/target/
-microservices/*/target/
 *.class
 *.jar
 
@@ -16,9 +15,3 @@ frontend/dist/
 # Environment
 .env
 *.env.local
-backend/application.properties
-application-local.properties
-application-local.yml
-
-# TLS certs (generate locally with scripts/generate-self-signed-cert.sh)
-frontend/certs/

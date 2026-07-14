@@ -1,4 +1,4 @@
-import { api, BASE_URL } from './client';
+import { api, BASE_URL, tokenStore } from './client';
 import type {
   ApprovalInfo,
   ApprovalRouting,
@@ -260,3 +260,4 @@ export const reportApi = {
     api.get('/reports/parties/pdf', { params: { from, to }, responseType: 'blob' }).then((r) => r.data as Blob),
 };
 
+export { tokenStore };

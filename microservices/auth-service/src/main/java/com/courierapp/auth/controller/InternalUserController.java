@@ -6,21 +6,18 @@ import com.courierapp.auth.exception.ResourceNotFoundException;
 import com.courierapp.auth.repository.UserRepository;
 import com.courierapp.auth.security.AppUserPrincipal;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /**
- * Internal endpoints — called only by other microservices, never by external clients.
- * Callers must present the shared internal secret in X-Internal-Auth; the gateway strips
- * any client-supplied copy of this header, so only a service holding the real secret can pass.
+ * Internal endpoints — called only by other microservices via Feign.
+ * The API Gateway forwards all requests including these; calling services
+ * must pass X-Internal-Service: true header (validated by filter below).
  */
 @RestController
 @RequestMapping("/internal")
@@ -29,14 +26,11 @@ public class InternalUserController {
 
     private final UserRepository userRepository;
 
-    @Value("${app.internal.secret}")
-    private String internalSecret;
-
     @GetMapping("/users/{id}")
     public ResponseEntity<Map<String, Object>> getUserById(
             @PathVariable Long id,
-            @RequestHeader(value = "X-Internal-Auth", required = false) String providedSecret) {
-        if (!isValidInternalSecret(providedSecret)) return ResponseEntity.status(403).build();
+            @RequestHeader(value = "X-Internal-Service", required = false) String internalFlag) {
+        if (!"true".equals(internalFlag)) return ResponseEntity.status(403).build();
         User user = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User", id));
         return ResponseEntity.ok(toMap(user));
     }
@@ -44,16 +38,11 @@ public class InternalUserController {
     @GetMapping("/users/by-username/{username}")
     public ResponseEntity<Map<String, Object>> getUserByUsername(
             @PathVariable String username,
-            @RequestHeader(value = "X-Internal-Auth", required = false) String providedSecret) {
-        if (!isValidInternalSecret(providedSecret)) return ResponseEntity.status(403).build();
+            @RequestHeader(value = "X-Internal-Service", required = false) String internalFlag) {
+        if (!"true".equals(internalFlag)) return ResponseEntity.status(403).build();
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User", username));
         return ResponseEntity.ok(toMap(user));
-    }
-
-    private boolean isValidInternalSecret(String providedSecret) {
-        return providedSecret != null && MessageDigest.isEqual(
-                providedSecret.getBytes(StandardCharsets.UTF_8), internalSecret.getBytes(StandardCharsets.UTF_8));
     }
 
     private Map<String, Object> toMap(User u) {

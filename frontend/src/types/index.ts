@@ -16,13 +16,11 @@ export interface AuditLog {
   createdAt: string;
 }
 
-// Tokens themselves are never in this body — they're set as httpOnly cookies by the server.
 export interface TokenResponse {
   accessToken: string | null;
   refreshToken: string | null;
   tokenType: string | null;
   expiresIn: number;
-  mfaRequired: boolean;
 }
 
 export interface CurrentUser {

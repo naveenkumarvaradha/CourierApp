@@ -1,0 +1,2 @@
+com\courierapp\gateway\ApiGatewayApplication.class
+com\courierapp\gateway\filter\JwtAuthGatewayFilter.class

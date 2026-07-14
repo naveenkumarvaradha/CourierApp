@@ -22,7 +22,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @Slf4j
 @RestController
@@ -227,7 +226,7 @@ public class AdminController {
     @PutMapping("/mail-config")
     @PreAuthorize("hasAuthority('ADMIN_UPDATE')")
     @Operation(summary = "Save global mail (SMTP) configuration")
-    public MailConfigResponse saveMailConfig(@Valid @RequestBody MailConfigRequest request) {
+    public MailConfigResponse saveMailConfig(@RequestBody MailConfigRequest request) {
         return adminService.saveMailConfig(request);
     }
 
@@ -411,33 +410,18 @@ public class AdminController {
         return adminService.updateCompanySettingsByCompanyId(id, request);
     }
 
-    private static final long MAX_LOGO_SIZE_BYTES = 2L * 1024 * 1024; // 2 MB
-    private static final Set<String> ALLOWED_LOGO_CONTENT_TYPES =
-            Set.of("image/png", "image/jpeg", "image/gif", "image/webp");
-
     @PostMapping(value = "/companies/{id}/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAuthority('ADMIN_UPDATE')")
     @Operation(summary = "Upload or replace the company logo")
     public ResponseEntity<Map<String, String>> uploadLogo(
             @PathVariable Long id,
             @RequestParam("file") MultipartFile file) {
-        if (file.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "File is empty"));
-        }
-        if (file.getSize() > MAX_LOGO_SIZE_BYTES) {
-            return ResponseEntity.badRequest().body(Map.of("message", "File exceeds the 2 MB size limit"));
-        }
-        String contentType = file.getContentType();
-        if (contentType == null || !ALLOWED_LOGO_CONTENT_TYPES.contains(contentType.toLowerCase())) {
-            return ResponseEntity.badRequest().body(Map.of("message",
-                    "Unsupported file type — only PNG, JPEG, GIF, or WEBP images are allowed"));
-        }
         try {
-            adminService.saveCompanyLogo(id, file.getBytes(), contentType);
+            adminService.saveCompanyLogo(id, file.getBytes(), file.getContentType());
             return ResponseEntity.ok(Map.of("message", "Logo uploaded successfully"));
         } catch (Exception e) {
             log.error("Logo upload failed for company {}: {}", id, e.getMessage());
-            return ResponseEntity.status(500).body(Map.of("message", "Logo upload failed"));
+            return ResponseEntity.status(500).body(Map.of("message", e.getMessage()));
         }
     }
 
@@ -445,17 +429,9 @@ public class AdminController {
     @Operation(summary = "Download the company logo")
     public ResponseEntity<byte[]> getLogo(@PathVariable Long id) {
         return adminService.getCompanyLogo(id)
-                .map(logo -> {
-                    // Never trust a stored content-type blindly when rendering it back to a browser —
-                    // fall back to a safe default so a legacy/tampered record can't be served as HTML.
-                    String contentType = logo.contentType() != null
-                            && ALLOWED_LOGO_CONTENT_TYPES.contains(logo.contentType().toLowerCase())
-                            ? logo.contentType() : "application/octet-stream";
-                    return ResponseEntity.ok()
-                            .contentType(MediaType.parseMediaType(contentType))
-                            .header("X-Content-Type-Options", "nosniff")
-                            .body(logo.data());
-                })
+                .map(logo -> ResponseEntity.ok()
+                        .contentType(MediaType.parseMediaType(logo.contentType() != null ? logo.contentType() : "image/png"))
+                        .body(logo.data()))
                 .orElse(ResponseEntity.notFound().build());
     }
 

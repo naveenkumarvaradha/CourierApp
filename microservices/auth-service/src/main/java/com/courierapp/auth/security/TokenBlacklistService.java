@@ -4,12 +4,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.Date;
-import java.util.HexFormat;
 
 /**
  * Redis-backed JWT token blacklist.
@@ -33,23 +29,13 @@ public class TokenBlacklistService {
         if (expiry == null) return;
         long ttlMillis = expiry.getTime() - System.currentTimeMillis();
         if (ttlMillis <= 0) return;                 // already expired — no need to store
-        String key = PREFIX + hash(token);
+        String key = PREFIX + token.hashCode();     // hash to keep key short
         redisTemplate.opsForValue().set(key, "1", Duration.ofMillis(ttlMillis));
         log.debug("Token blacklisted (ttl={}s)", ttlMillis / 1000);
     }
 
     /** Returns true when the token has been revoked. */
     public boolean isBlacklisted(String token) {
-        return Boolean.TRUE.equals(redisTemplate.hasKey(PREFIX + hash(token)));
-    }
-
-    /** SHA-256 digest of the token — collision-resistant, unlike Object.hashCode(). */
-    private String hash(String token) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(token.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 not available", e);
-        }
+        return Boolean.TRUE.equals(redisTemplate.hasKey(PREFIX + token.hashCode()));
     }
 }
