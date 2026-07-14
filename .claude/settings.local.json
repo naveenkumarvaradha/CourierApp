@@ -83,7 +83,8 @@
       "Bash(xargs cat)",
       "Bash(git check-ignore *)",
       "Bash(xargs -I{} basename {})",
-      "Bash(\"/c/src/flutter/bin/flutter.bat\" run *)"
+      "Bash(\"/c/src/flutter/bin/flutter.bat\" run *)",
+      "Bash(git config *)"
     ]
   }
 }
