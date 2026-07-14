@@ -52,7 +52,7 @@ export const authApi = {
   resetPassword: (token: string, newPassword: string) =>
     api.post<{ message: string }>('/auth/reset-password', { token, newPassword }).then((r) => r.data),
   logout: () =>
-    api.post<{ message: string }>('/auth/logout').then((r) => r.data),
+    api.post<{ message: string }>('/auth/logout', { refreshToken: tokenStore.getRefresh() }).then((r) => r.data),
 };
 
 // ---------- Admin ----------

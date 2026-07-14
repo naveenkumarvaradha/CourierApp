@@ -1,8 +1,9 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import type { TokenResponse } from '../types';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL
-  ?? `http://${window.location.hostname}:8080/api`;
+// Falls back to a same-origin relative path (inherits the page's own protocol) rather than
+// a hardcoded http:// URL, so a misconfigured deployment never silently downgrades to plaintext.
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
 
 const ACCESS_KEY = 'cb_access_token';
 const REFRESH_KEY = 'cb_refresh_token';

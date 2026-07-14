@@ -9,7 +9,7 @@ public interface AuthService {
     void changePassword(String username, ChangePasswordRequest request);
     void forgotPassword(ForgotPasswordRequest request);
     void resetPassword(ResetPasswordRequest request);
-    void logout(String token);
+    void logout(String accessToken, String refreshToken);
     MfaSetupResponse setupMfa(String username);
     void enableMfa(String username, String code);
     void disableMfa(String username);

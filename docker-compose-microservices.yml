@@ -1,6 +1,9 @@
 services:
 
   # ── PostgreSQL 15 ──────────────────────────────────────────────────────────
+  # Not published to the host — reachable only from other containers on this
+  # compose network. Connect via `docker compose exec postgres psql ...` or a
+  # temporary port-forward if you need host access for local debugging.
   postgres:
     image: postgres:15-alpine
     container_name: shipdesk-ms-postgres
@@ -8,9 +11,7 @@ services:
     environment:
       POSTGRES_DB: courierdb
       POSTGRES_USER: courier_user
-      POSTGRES_PASSWORD: courier_pass
-    ports:
-      - "5432:5432"
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your .env file}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -21,22 +22,22 @@ services:
       start_period: 10s
 
   # ── Redis 7 ───────────────────────────────────────────────────────────────
+  # Not published to the host — internal network only.
   redis:
     image: redis:7-alpine
     container_name: shipdesk-ms-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass redis_pass
-    ports:
-      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:?Set REDIS_PASSWORD in your .env file}
     volumes:
       - redisdata:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "redis_pass", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?Set REDIS_PASSWORD in your .env file}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   # ── Zookeeper ─────────────────────────────────────────────────────────────
+  # Not published to the host — internal network only.
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: shipdesk-zookeeper
@@ -44,8 +45,6 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - "2181:2181"
     healthcheck:
       test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
       interval: 10s
@@ -54,6 +53,7 @@ services:
       start_period: 10s
 
   # ── Kafka ─────────────────────────────────────────────────────────────────
+  # Not published to the host — internal network only.
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: shipdesk-kafka
@@ -70,8 +70,6 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-    ports:
-      - "9092:9092"
     healthcheck:
       test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list"]
       interval: 15s
@@ -80,6 +78,8 @@ services:
       start_period: 30s
 
   # ── Eureka Service Registry ────────────────────────────────────────────────
+  # Published for operator access to the registry dashboard — protected by
+  # HTTP Basic auth (EUREKA_USERNAME/EUREKA_PASSWORD, both required below).
   eureka-server:
     build:
       context: ./microservices/eureka-server
@@ -89,7 +89,7 @@ services:
     environment:
       SERVER_PORT: 8761
       EUREKA_USERNAME: ${EUREKA_USERNAME:-admin}
-      EUREKA_PASSWORD: ${EUREKA_PASSWORD:-admin123}
+      EUREKA_PASSWORD: ${EUREKA_PASSWORD:?Set EUREKA_PASSWORD in your .env file}
       EUREKA_CLIENT_REGISTER_WITH_EUREKA: "false"
       EUREKA_CLIENT_FETCH_REGISTRY: "false"
     ports:
@@ -102,6 +102,8 @@ services:
       start_period: 60s
 
   # ── API Gateway ───────────────────────────────────────────────────────────
+  # The only backend entry point published to the host — every request to a
+  # downstream service must pass through here, where the JWT is validated.
   api-gateway:
     build:
       context: ./microservices/api-gateway
@@ -112,8 +114,11 @@ services:
       SERVER_PORT: 8080
       EUREKA_HOST: eureka-server
       EUREKA_USERNAME: ${EUREKA_USERNAME:-admin}
-      EUREKA_PASSWORD: ${EUREKA_PASSWORD:-admin123}
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://${EUREKA_USERNAME:-admin}:${EUREKA_PASSWORD:-admin123}@eureka-server:8761/eureka/
+      EUREKA_PASSWORD: ${EUREKA_PASSWORD:?Set EUREKA_PASSWORD in your .env file}
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://${EUREKA_USERNAME:-admin}:${EUREKA_PASSWORD:?Set EUREKA_PASSWORD in your .env file}@eureka-server:8761/eureka/
+      APP_JWT_SECRET: ${APP_JWT_SECRET:?Set APP_JWT_SECRET in your .env file to a random 256-bit value}
+      APP_INTERNAL_SECRET: ${APP_INTERNAL_SECRET:?Set APP_INTERNAL_SECRET in your .env file to a random value}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
     ports:
       - "8080:8080"
     depends_on:
@@ -127,6 +132,9 @@ services:
       start_period: 90s
 
   # ── Auth Service ──────────────────────────────────────────────────────────
+  # Not published to the host — reachable only via the API Gateway (or other
+  # containers on this network). Direct access would let identity headers be
+  # forged; APP_INTERNAL_SECRET guards against that even on the internal network.
   auth-service:
     build:
       context: ./microservices/auth-service
@@ -138,13 +146,14 @@ services:
       # Database
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/courierdb
       SPRING_DATASOURCE_USERNAME: courier_user
-      SPRING_DATASOURCE_PASSWORD: courier_pass
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your .env file}
       # Redis
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
-      SPRING_DATA_REDIS_PASSWORD: redis_pass
-      # JWT
-      APP_JWT_SECRET: ${APP_JWT_SECRET:-change-me-to-a-secure-256bit-key-in-production-must-be-very-long}
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in your .env file}
+      # JWT / internal service auth
+      APP_JWT_SECRET: ${APP_JWT_SECRET:?Set APP_JWT_SECRET in your .env file to a random 256-bit value}
+      APP_INTERNAL_SECRET: ${APP_INTERNAL_SECRET:?Set APP_INTERNAL_SECRET in your .env file to a random value}
       # Mail
       SPRING_MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
       SPRING_MAIL_PORT: ${MAIL_PORT:-587}
@@ -153,11 +162,9 @@ services:
       # Eureka
       EUREKA_HOST: eureka-server
       EUREKA_USERNAME: ${EUREKA_USERNAME:-admin}
-      EUREKA_PASSWORD: ${EUREKA_PASSWORD:-admin123}
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://${EUREKA_USERNAME:-admin}:${EUREKA_PASSWORD:-admin123}@eureka-server:8761/eureka/
+      EUREKA_PASSWORD: ${EUREKA_PASSWORD:?Set EUREKA_PASSWORD in your .env file}
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://${EUREKA_USERNAME:-admin}:${EUREKA_PASSWORD:?Set EUREKA_PASSWORD in your .env file}@eureka-server:8761/eureka/
       SPRING_APPLICATION_NAME: auth-service
-    ports:
-      - "8081:8081"
     depends_on:
       postgres:
         condition: service_healthy
@@ -173,6 +180,7 @@ services:
       start_period: 90s
 
   # ── Booking Service ───────────────────────────────────────────────────────
+  # Not published to the host — reachable only via the API Gateway.
   booking-service:
     build:
       context: ./microservices/booking-service
@@ -184,19 +192,18 @@ services:
       # Database
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/courierdb
       SPRING_DATASOURCE_USERNAME: courier_user
-      SPRING_DATASOURCE_PASSWORD: courier_pass
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your .env file}
       # Kafka
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      # JWT
-      APP_JWT_SECRET: ${APP_JWT_SECRET:-change-me-to-a-secure-256bit-key-in-production-must-be-very-long}
+      # JWT / internal service auth
+      APP_JWT_SECRET: ${APP_JWT_SECRET:?Set APP_JWT_SECRET in your .env file to a random 256-bit value}
+      APP_INTERNAL_SECRET: ${APP_INTERNAL_SECRET:?Set APP_INTERNAL_SECRET in your .env file to a random value}
       # Eureka
       EUREKA_HOST: eureka-server
       EUREKA_USERNAME: ${EUREKA_USERNAME:-admin}
-      EUREKA_PASSWORD: ${EUREKA_PASSWORD:-admin123}
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://${EUREKA_USERNAME:-admin}:${EUREKA_PASSWORD:-admin123}@eureka-server:8761/eureka/
+      EUREKA_PASSWORD: ${EUREKA_PASSWORD:?Set EUREKA_PASSWORD in your .env file}
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://${EUREKA_USERNAME:-admin}:${EUREKA_PASSWORD:?Set EUREKA_PASSWORD in your .env file}@eureka-server:8761/eureka/
       SPRING_APPLICATION_NAME: booking-service
-    ports:
-      - "8082:8082"
     depends_on:
       postgres:
         condition: service_healthy
@@ -212,6 +219,7 @@ services:
       start_period: 90s
 
   # ── Party Service ─────────────────────────────────────────────────────────
+  # Not published to the host — reachable only via the API Gateway.
   party-service:
     build:
       context: ./microservices/party-service
@@ -223,17 +231,16 @@ services:
       # Database
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/courierdb
       SPRING_DATASOURCE_USERNAME: courier_user
-      SPRING_DATASOURCE_PASSWORD: courier_pass
-      # JWT
-      APP_JWT_SECRET: ${APP_JWT_SECRET:-change-me-to-a-secure-256bit-key-in-production-must-be-very-long}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your .env file}
+      # JWT / internal service auth
+      APP_JWT_SECRET: ${APP_JWT_SECRET:?Set APP_JWT_SECRET in your .env file to a random 256-bit value}
+      APP_INTERNAL_SECRET: ${APP_INTERNAL_SECRET:?Set APP_INTERNAL_SECRET in your .env file to a random value}
       # Eureka
       EUREKA_HOST: eureka-server
       EUREKA_USERNAME: ${EUREKA_USERNAME:-admin}
-      EUREKA_PASSWORD: ${EUREKA_PASSWORD:-admin123}
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://${EUREKA_USERNAME:-admin}:${EUREKA_PASSWORD:-admin123}@eureka-server:8761/eureka/
+      EUREKA_PASSWORD: ${EUREKA_PASSWORD:?Set EUREKA_PASSWORD in your .env file}
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://${EUREKA_USERNAME:-admin}:${EUREKA_PASSWORD:?Set EUREKA_PASSWORD in your .env file}@eureka-server:8761/eureka/
       SPRING_APPLICATION_NAME: party-service
-    ports:
-      - "8083:8083"
     depends_on:
       postgres:
         condition: service_healthy
@@ -247,6 +254,7 @@ services:
       start_period: 90s
 
   # ── Admin Service ─────────────────────────────────────────────────────────
+  # Not published to the host — reachable only via the API Gateway.
   admin-service:
     build:
       context: ./microservices/admin-service
@@ -255,20 +263,19 @@ services:
     restart: unless-stopped
     environment:
       SERVER_PORT: 8084
-      # Database
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/courierdb
-      SPRING_DATASOURCE_USERNAME: courier_user
-      SPRING_DATASOURCE_PASSWORD: courier_pass
-      # JWT
-      APP_JWT_SECRET: ${APP_JWT_SECRET:-change-me-to-a-secure-256bit-key-in-production-must-be-very-long}
+      # Database (admin-service reads DB_URL/DB_USERNAME/DB_PASSWORD, not SPRING_DATASOURCE_*)
+      DB_URL: jdbc:postgresql://postgres:5432/courierdb
+      DB_USERNAME: courier_user
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your .env file}
+      # JWT / internal service auth
+      APP_JWT_SECRET: ${APP_JWT_SECRET:?Set APP_JWT_SECRET in your .env file to a random 256-bit value}
+      APP_INTERNAL_SECRET: ${APP_INTERNAL_SECRET:?Set APP_INTERNAL_SECRET in your .env file to a random value}
       # Eureka
       EUREKA_HOST: eureka-server
       EUREKA_USERNAME: ${EUREKA_USERNAME:-admin}
-      EUREKA_PASSWORD: ${EUREKA_PASSWORD:-admin123}
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://${EUREKA_USERNAME:-admin}:${EUREKA_PASSWORD:-admin123}@eureka-server:8761/eureka/
+      EUREKA_PASSWORD: ${EUREKA_PASSWORD:?Set EUREKA_PASSWORD in your .env file}
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://${EUREKA_USERNAME:-admin}:${EUREKA_PASSWORD:?Set EUREKA_PASSWORD in your .env file}@eureka-server:8761/eureka/
       SPRING_APPLICATION_NAME: admin-service
-    ports:
-      - "8084:8084"
     depends_on:
       postgres:
         condition: service_healthy
@@ -282,6 +289,7 @@ services:
       start_period: 90s
 
   # ── Notification Service ───────────────────────────────────────────────────
+  # Not published to the host — Kafka consumer only, exposes no REST endpoints.
   notification-service:
     build:
       context: ./microservices/notification-service
@@ -300,11 +308,9 @@ services:
       # Eureka
       EUREKA_HOST: eureka-server
       EUREKA_USERNAME: ${EUREKA_USERNAME:-admin}
-      EUREKA_PASSWORD: ${EUREKA_PASSWORD:-admin123}
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://${EUREKA_USERNAME:-admin}:${EUREKA_PASSWORD:-admin123}@eureka-server:8761/eureka/
+      EUREKA_PASSWORD: ${EUREKA_PASSWORD:?Set EUREKA_PASSWORD in your .env file}
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://${EUREKA_USERNAME:-admin}:${EUREKA_PASSWORD:?Set EUREKA_PASSWORD in your .env file}@eureka-server:8761/eureka/
       SPRING_APPLICATION_NAME: notification-service
-    ports:
-      - "8085:8085"
     depends_on:
       kafka:
         condition: service_healthy
@@ -318,6 +324,7 @@ services:
       start_period: 90s
 
   # ── Report Service ────────────────────────────────────────────────────────
+  # Not published to the host — reachable only via the API Gateway.
   report-service:
     build:
       context: ./microservices/report-service
@@ -326,20 +333,19 @@ services:
     restart: unless-stopped
     environment:
       SERVER_PORT: 8086
-      # Database
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/courierdb
-      SPRING_DATASOURCE_USERNAME: courier_user
-      SPRING_DATASOURCE_PASSWORD: courier_pass
-      # JWT
-      APP_JWT_SECRET: ${APP_JWT_SECRET:-change-me-to-a-secure-256bit-key-in-production-must-be-very-long}
+      # Database (report-service reads DB_URL/DB_USERNAME/DB_PASSWORD, not SPRING_DATASOURCE_*)
+      DB_URL: jdbc:postgresql://postgres:5432/courierdb
+      DB_USERNAME: courier_user
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your .env file}
+      # JWT / internal service auth
+      APP_JWT_SECRET: ${APP_JWT_SECRET:?Set APP_JWT_SECRET in your .env file to a random 256-bit value}
+      APP_INTERNAL_SECRET: ${APP_INTERNAL_SECRET:?Set APP_INTERNAL_SECRET in your .env file to a random value}
       # Eureka
       EUREKA_HOST: eureka-server
       EUREKA_USERNAME: ${EUREKA_USERNAME:-admin}
-      EUREKA_PASSWORD: ${EUREKA_PASSWORD:-admin123}
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://${EUREKA_USERNAME:-admin}:${EUREKA_PASSWORD:-admin123}@eureka-server:8761/eureka/
+      EUREKA_PASSWORD: ${EUREKA_PASSWORD:?Set EUREKA_PASSWORD in your .env file}
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://${EUREKA_USERNAME:-admin}:${EUREKA_PASSWORD:?Set EUREKA_PASSWORD in your .env file}@eureka-server:8761/eureka/
       SPRING_APPLICATION_NAME: report-service
-    ports:
-      - "8086:8086"
     depends_on:
       postgres:
         condition: service_healthy
@@ -358,7 +364,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://192.168.2.245:8080/api}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:?Set VITE_API_BASE_URL in your .env file to your gateway's public URL, e.g. https://your-host:8080/api}
     container_name: shipdesk-ms-frontend
     restart: unless-stopped
     ports:

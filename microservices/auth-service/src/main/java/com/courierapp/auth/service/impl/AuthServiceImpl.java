@@ -47,14 +47,22 @@ public class AuthServiceImpl implements AuthService {
     private final TokenBlacklistService tokenBlacklistService;
     private final MfaService mfaService;
     private final SessionTrackingService sessionTrackingService;
+    private final LoginAttemptService loginAttemptService;
 
     @Override
     @Transactional(readOnly = true)
     public TokenResponse login(LoginRequest request) {
-        Company company = companyRepository.findByCompanyCodeIgnoreCase(request.companyCode())
-                .orElseThrow(() -> new BadCredentialsException("Invalid company code or credentials"));
-        if (!company.isActive()) throw new BadCredentialsException("Company account is inactive");
+        String attemptKey = (request.companyCode() + ":" + request.username()).toLowerCase();
+        if (loginAttemptService.isLocked(attemptKey)) {
+            auditLogService.log("AUTH", "LOGIN_LOCKED", null, request.username(), request.username(),
+                    "Too many failed attempts — temporarily locked");
+            throw new BusinessException("Too many failed login attempts. Please try again in a few minutes.",
+                    HttpStatus.TOO_MANY_REQUESTS);
+        }
         try {
+            Company company = companyRepository.findByCompanyCodeIgnoreCase(request.companyCode())
+                    .orElseThrow(() -> new BadCredentialsException("Invalid company code or credentials"));
+            if (!company.isActive()) throw new BadCredentialsException("Company account is inactive");
             Authentication auth = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.username(), request.password()));
             AppUserPrincipal principal = (AppUserPrincipal) auth.getPrincipal();
@@ -67,6 +75,7 @@ public class AuthServiceImpl implements AuthService {
             }
             if (user.isMfaEnabled() && user.getMfaSecret() != null) {
                 String pending = jwtService.generateMfaPendingToken(principal.getUsername(), user.getId());
+                loginAttemptService.recordSuccess(attemptKey);
                 return TokenResponse.mfaRequired(pending);
             }
             List<String> authorities = principal.getAuthorityStrings().stream().sorted().toList();
@@ -76,8 +85,10 @@ public class AuthServiceImpl implements AuthService {
                     principal.getUsername(), "Company: " + company.getCompanyCode());
             TokenResponse response = TokenResponse.bearer(access, refresh, jwtService.getAccessExpirySeconds());
             sessionTrackingService.registerSession(principal.getId(), principal.getUsername(), access);
+            loginAttemptService.recordSuccess(attemptKey);
             return response;
         } catch (BadCredentialsException ex) {
+            loginAttemptService.recordFailure(attemptKey);
             auditLogService.log("AUTH", "LOGIN_FAILED", null, request.username(), request.username(), "Invalid credentials");
             throw ex;
         }
@@ -94,6 +105,8 @@ public class AuthServiceImpl implements AuthService {
         }
         if (!jwtService.isRefreshToken(claims))
             throw new BusinessException("Provided token is not a refresh token", HttpStatus.UNAUTHORIZED);
+        if (tokenBlacklistService.isBlacklisted(request.refreshToken()))
+            throw new BusinessException("Refresh token has already been used", HttpStatus.UNAUTHORIZED);
         String username = claims.getSubject();
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new BusinessException("User no longer exists", HttpStatus.UNAUTHORIZED));
@@ -103,6 +116,9 @@ public class AuthServiceImpl implements AuthService {
         Long companyId = user.getCompany() != null ? user.getCompany().getId() : null;
         String access = jwtService.generateAccessToken(username, user.getId(), companyId, authorities);
         String newRefresh = jwtService.generateRefreshToken(username, user.getId());
+        // Rotation: the presented refresh token is single-use — blacklist it immediately so a
+        // captured/replayed copy can never be exchanged again.
+        tokenBlacklistService.blacklist(request.refreshToken(), claims.getExpiration());
         return TokenResponse.bearer(access, newRefresh, jwtService.getAccessExpirySeconds());
     }
 
@@ -135,15 +151,18 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void forgotPassword(ForgotPasswordRequest request) {
-        User user = userRepository.findByUsername(request.username())
-                .orElseThrow(() -> new BusinessException("No account found with username '" + request.username() + "'."));
-        if (!user.isActive()) throw new BusinessException("This account is inactive.");
-        resetTokenRepository.deleteByUserId(user.getId());
-        String token = UUID.randomUUID().toString();
-        PasswordResetToken prt = PasswordResetToken.builder()
-                .user(user).token(token).expiresAt(Instant.now().plus(24, ChronoUnit.HOURS)).build();
-        resetTokenRepository.save(prt);
-        emailService.sendPasswordResetEmail(user.getEmail(), user.getFullName(), token);
+        // Always respond the same way regardless of whether the account exists or is active —
+        // returning a distinct error here would let an attacker enumerate valid usernames.
+        userRepository.findByUsername(request.username())
+                .filter(User::isActive)
+                .ifPresent(user -> {
+                    resetTokenRepository.deleteByUserId(user.getId());
+                    String token = UUID.randomUUID().toString();
+                    PasswordResetToken prt = PasswordResetToken.builder()
+                            .user(user).token(token).expiresAt(Instant.now().plus(24, ChronoUnit.HOURS)).build();
+                    resetTokenRepository.save(prt);
+                    emailService.sendPasswordResetEmail(user.getEmail(), user.getFullName(), token);
+                });
     }
 
     @Override
@@ -226,15 +245,23 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public void logout(String token) {
+    public void logout(String accessToken, String refreshToken) {
         try {
-            Claims claims = jwtService.parse(token);
-            tokenBlacklistService.blacklist(token, claims.getExpiration());
+            Claims claims = jwtService.parse(accessToken);
+            tokenBlacklistService.blacklist(accessToken, claims.getExpiration());
             Object uid = claims.get("uid");
             if (uid != null) sessionTrackingService.removeSession(Long.valueOf(uid.toString()));
             auditLogService.log("AUTH", "LOGOUT", null, claims.getSubject(), claims.getSubject(), null);
         } catch (Exception ex) {
             log.warn("Logout called with invalid token: {}", ex.getMessage());
+        }
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            try {
+                Claims refreshClaims = jwtService.parse(refreshToken);
+                tokenBlacklistService.blacklist(refreshToken, refreshClaims.getExpiration());
+            } catch (Exception ex) {
+                log.warn("Logout called with invalid refresh token: {}", ex.getMessage());
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 services:
 
   # ── PostgreSQL 15 ──────────────────────────────────────────────────────────
+  # Not published to the host — reachable only from the backend container.
   postgres:
     image: postgres:15-alpine
     container_name: shipdesk-postgres
@@ -8,9 +9,7 @@ services:
     environment:
       POSTGRES_DB: courierdb
       POSTGRES_USER: courier_user
-      POSTGRES_PASSWORD: courier_pass
-    ports:
-      - "5432:5432"
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your .env file}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -21,17 +20,16 @@ services:
       start_period: 10s
 
   # ── Redis 7 ───────────────────────────────────────────────────────────────
+  # Not published to the host — reachable only from the backend container.
   redis:
     image: redis:7-alpine
     container_name: shipdesk-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass redis_pass
-    ports:
-      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:?Set REDIS_PASSWORD in your .env file}
     volumes:
       - redisdata:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "redis_pass", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?Set REDIS_PASSWORD in your .env file}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -49,16 +47,16 @@ services:
       # Database
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/courierdb
       SPRING_DATASOURCE_USERNAME: courier_user
-      SPRING_DATASOURCE_PASSWORD: courier_pass
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your .env file}
       # Redis
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
-      SPRING_DATA_REDIS_PASSWORD: redis_pass
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in your .env file}
       # App
       SPRING_PROFILES_ACTIVE: prod
       SERVER_PORT: 8080
-      # JWT secret (override with a secure value in production)
-      APP_JWT_SECRET: ${APP_JWT_SECRET:-change-me-to-a-secure-256bit-key-in-production}
+      # JWT secret — must be a random 256-bit value, e.g. `openssl rand -base64 48`
+      APP_JWT_SECRET: ${APP_JWT_SECRET:?Set APP_JWT_SECRET in your .env file to a random 256-bit value}
       # Mail (set these in .env file for real email)
       SPRING_MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
       SPRING_MAIL_PORT: ${MAIL_PORT:-587}

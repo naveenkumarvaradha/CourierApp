@@ -6,6 +6,10 @@ spring:
     name: api-gateway
   cloud:
     gateway:
+      default-filters:
+        - AddResponseHeader=X-Content-Type-Options, nosniff
+        - AddResponseHeader=X-Frame-Options, DENY
+        - AddResponseHeader=Referrer-Policy, strict-origin-when-cross-origin
       discovery:
         locator:
           enabled: true

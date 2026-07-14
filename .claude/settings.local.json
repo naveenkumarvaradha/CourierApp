@@ -81,7 +81,9 @@
       "Bash(grep -v \"PASSWORD:\\\\|SECRET:\\\\|\\\\${\")",
       "Bash(git fetch *)",
       "Bash(xargs cat)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(xargs -I{} basename {})",
+      "Bash(\"/c/src/flutter/bin/flutter.bat\" run *)"
     ]
   }
 }

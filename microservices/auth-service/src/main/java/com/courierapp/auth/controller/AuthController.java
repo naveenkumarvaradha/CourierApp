@@ -65,9 +65,10 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Map<String, String>> logout(
-            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestBody(required = false) LogoutRequest request) {
         if (authHeader != null && authHeader.startsWith("Bearer "))
-            authService.logout(authHeader.substring(7));
+            authService.logout(authHeader.substring(7), request != null ? request.refreshToken() : null);
         return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 
