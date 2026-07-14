@@ -1,6 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
 import { authApi } from '../api/endpoints';
-import { tokenStore } from '../api/client';
 import { useAppDispatch } from '../store/hooks';
 import { setUser as setUserAction, clearUser, setLoading as setLoadingAction } from '../store/authSlice';
 import { baseApi } from '../store/api/baseApi';
@@ -23,21 +22,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const loadUser = useCallback(async () => {
-    if (!tokenStore.getAccess()) {
-      setLoading(false);
-      dispatch(setLoadingAction(false));
-      return;
-    }
+    // No client-readable token to check — the access_token cookie (if any) is httpOnly, so
+    // we just attempt the call and treat a 401 as "not logged in".
     try {
       const me = await authApi.me();
       setUser(me);
       dispatch(setUserAction(me));
     } catch {
-      tokenStore.clear();
       setUser(null);
       dispatch(clearUser());
     } finally {
       setLoading(false);
+      dispatch(setLoadingAction(false));
     }
   }, [dispatch]);
 
@@ -46,8 +42,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [loadUser]);
 
   const login = useCallback(async (companyCode: string, username: string, password: string) => {
-    const tokens = await authApi.login(companyCode, username, password);
-    tokenStore.set(tokens.accessToken!, tokens.refreshToken!);
+    const result = await authApi.login(companyCode, username, password);
+    if (result.mfaRequired) {
+      // MFA verification isn't wired up in this UI yet — surface a clear error rather than
+      // silently proceeding as if login succeeded.
+      throw new Error('This account requires MFA verification, which isn\'t supported here yet.');
+    }
     const me = await authApi.me();
     setUser(me);
     dispatch(setUserAction(me));
@@ -59,7 +59,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // best-effort
     } finally {
-      tokenStore.clear();
       setUser(null);
       dispatch(clearUser());
       dispatch(baseApi.util.resetApiState());

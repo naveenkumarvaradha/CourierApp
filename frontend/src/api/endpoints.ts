@@ -1,4 +1,4 @@
-import { api, BASE_URL, tokenStore } from './client';
+import { api, BASE_URL } from './client';
 import type {
   ApprovalInfo,
   ApprovalRouting,
@@ -52,7 +52,7 @@ export const authApi = {
   resetPassword: (token: string, newPassword: string) =>
     api.post<{ message: string }>('/auth/reset-password', { token, newPassword }).then((r) => r.data),
   logout: () =>
-    api.post<{ message: string }>('/auth/logout', { refreshToken: tokenStore.getRefresh() }).then((r) => r.data),
+    api.post<{ message: string }>('/auth/logout').then((r) => r.data),
 };
 
 // ---------- Admin ----------
@@ -260,4 +260,3 @@ export const reportApi = {
     api.get('/reports/parties/pdf', { params: { from, to }, responseType: 'blob' }).then((r) => r.data as Blob),
 };
 
-export { tokenStore };
