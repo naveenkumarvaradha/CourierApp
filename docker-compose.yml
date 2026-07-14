@@ -35,14 +35,14 @@ services:
       retries: 5
 
   # ── Spring Boot Backend ───────────────────────────────────────────────────
+  # Not published to the host — the frontend's nginx reverse-proxies /api/*
+  # to this service over the internal docker network.
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: shipdesk-backend
     restart: unless-stopped
-    ports:
-      - "8080:8080"
     environment:
       # Database
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/courierdb
@@ -75,18 +75,24 @@ services:
       start_period: 90s
 
   # ── React Frontend (Nginx) ────────────────────────────────────────────────
+  # The only host-published HTTP(S) entry point. Terminates TLS and reverse-
+  # proxies /api/* to backend over the internal network (see nginx.conf.template).
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # The browser connects to backend directly — use the host machine's IP or domain
-        # Replace 192.168.2.245 with your server's IP or domain name
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://192.168.2.245:8080/api}
+        # Relative path — same-origin now that nginx proxies /api internally.
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
     container_name: shipdesk-frontend
     restart: unless-stopped
+    environment:
+      API_UPSTREAM: http://backend:8080
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - ./frontend/certs:/etc/nginx/certs:ro
     depends_on:
       backend:
         condition: service_healthy

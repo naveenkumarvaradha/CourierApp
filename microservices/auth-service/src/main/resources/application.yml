@@ -85,6 +85,10 @@ app:
     refresh-token-expiry-days: 7
   internal:
     secret: ${APP_INTERNAL_SECRET}
+  cookie:
+    # Requires HTTPS. Only set COOKIE_SECURE=false for local HTTP-only dev
+    # (e.g. `mvn spring-boot:run` without TLS) — never in a real deployment.
+    secure: ${COOKIE_SECURE:true}
   mfa:
     issuer: CourierApp
   name: Courier Booking

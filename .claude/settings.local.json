@@ -84,7 +84,13 @@
       "Bash(git check-ignore *)",
       "Bash(xargs -I{} basename {})",
       "Bash(\"/c/src/flutter/bin/flutter.bat\" run *)",
-      "Bash(git config *)"
+      "Bash(git config *)",
+      "Bash(MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL=\"*\" bash scripts/generate-self-signed-cert.sh localhost 127.0.0.1)",
+      "Bash(git mv *)",
+      "Bash(mv frontend/nginx.conf frontend/nginx.conf.template)",
+      "Bash(nginx -v)",
+      "PowerShell(Get-Process -Name navee_os)",
+      "Bash(rm -f \"C:/Users/NAVEEN~1.TRO/AppData/Local/Temp/navee_os_window.png\" \"C:/Users/NAVEEN~1.TRO/AppData/Local/Temp/navee_os_screenshot.png\"; echo cleaned)"
     ]
   }
 }

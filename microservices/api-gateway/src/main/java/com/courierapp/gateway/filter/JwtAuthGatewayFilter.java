@@ -21,7 +21,9 @@ import reactor.core.publisher.Mono;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Component
 public class JwtAuthGatewayFilter implements GlobalFilter, Ordered {
@@ -94,13 +96,13 @@ public class JwtAuthGatewayFilter implements GlobalFilter, Ordered {
             return chain.filter(exchange);
         }
 
-        // All other paths require a valid Bearer JWT
-        String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return unauthorize(exchange, "Missing or invalid Authorization header");
+        // All other paths require a valid access token — read from the httpOnly cookie the
+        // browser sends automatically; fall back to an Authorization header for tooling/tests.
+        String token = extractToken(exchange.getRequest());
+        if (token == null) {
+            return unauthorize(exchange, "Missing or invalid access token");
         }
 
-        String token = authHeader.substring(7);
         try {
             Claims claims = Jwts.parser()
                 .verifyWith(signingKey)
@@ -122,7 +124,7 @@ public class JwtAuthGatewayFilter implements GlobalFilter, Ordered {
                     headers.set("X-User-Id",      claims.get("uid")   != null ? claims.get("uid").toString()  : "");
                     headers.set("X-Username",     claims.getSubject() != null ? claims.getSubject()            : "");
                     headers.set("X-Company-Id",   claims.get("cid")   != null ? claims.get("cid").toString()  : "");
-                    headers.set("X-Roles",        claims.get("roles") != null ? claims.get("roles").toString() : "");
+                    headers.set("X-Roles",        extractRolesHeader(claims));
                     headers.set("X-Internal-Auth", internalSecret);
                 })
                 .build();
@@ -133,6 +135,33 @@ public class JwtAuthGatewayFilter implements GlobalFilter, Ordered {
             log.debug("JWT validation failed for path {}: {}", path, e.getMessage());
             return unauthorize(exchange, "Invalid or expired token");
         }
+    }
+
+    /** Prefers the httpOnly access_token cookie; falls back to an Authorization header for tooling. */
+    private String extractToken(ServerHttpRequest request) {
+        var cookie = request.getCookies().getFirst("access_token");
+        if (cookie != null && !cookie.getValue().isBlank()) {
+            return cookie.getValue();
+        }
+        String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
+        return null;
+    }
+
+    /**
+     * The JWT stores authorities as a JSON array under the "authorities" claim (see
+     * JwtService.generateAccessToken), which JJWT deserializes as a List — join it into a
+     * clean comma-separated string rather than relying on List.toString()'s "[a, b]" format,
+     * which HeaderAuthenticationFilter's naive split(",") would otherwise mangle.
+     */
+    private String extractRolesHeader(Claims claims) {
+        Object raw = claims.get("authorities");
+        if (raw instanceof List<?> list) {
+            return list.stream().map(String::valueOf).collect(Collectors.joining(","));
+        }
+        return raw != null ? raw.toString() : "";
     }
 
     /**

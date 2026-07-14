@@ -94,6 +94,8 @@ app:
     secret: ${APP_JWT_SECRET}
   internal:
     secret: ${APP_INTERNAL_SECRET}
+  cookie:
+    secure: ${COOKIE_SECURE:true}
 
 management:
   endpoints:

@@ -102,8 +102,11 @@ services:
       start_period: 60s
 
   # ── API Gateway ───────────────────────────────────────────────────────────
-  # The only backend entry point published to the host — every request to a
-  # downstream service must pass through here, where the JWT is validated.
+  # Not published to the host — the frontend's nginx reverse-proxies /api/*
+  # to this service over the internal docker network, so the browser only
+  # ever talks to nginx on 443. This also means no CORS is needed for real
+  # traffic; the gateway's CORS config remains only as a safety net for
+  # direct API testing from the internal network.
   api-gateway:
     build:
       context: ./microservices/api-gateway
@@ -119,8 +122,6 @@ services:
       APP_JWT_SECRET: ${APP_JWT_SECRET:?Set APP_JWT_SECRET in your .env file to a random 256-bit value}
       APP_INTERNAL_SECRET: ${APP_INTERNAL_SECRET:?Set APP_INTERNAL_SECRET in your .env file to a random value}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
-    ports:
-      - "8080:8080"
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -359,16 +360,24 @@ services:
       start_period: 90s
 
   # ── React Frontend (Nginx) ────────────────────────────────────────────────
+  # The only host-published HTTP(S) entry point. Terminates TLS and reverse-
+  # proxies /api/* to api-gateway over the internal network (see nginx.conf.template).
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:?Set VITE_API_BASE_URL in your .env file to your gateway's public URL, e.g. https://your-host:8080/api}
+        # Relative path — same-origin now that nginx proxies /api internally.
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
     container_name: shipdesk-ms-frontend
     restart: unless-stopped
+    environment:
+      API_UPSTREAM: http://api-gateway:8080
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - ./frontend/certs:/etc/nginx/certs:ro
     depends_on:
       api-gateway:
         condition: service_healthy
