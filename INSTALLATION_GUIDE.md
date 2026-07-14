@@ -1,12 +1,12 @@
-# Installation Guide (Windows)
+# Installation Guide (Windows — Local Development)
 
-Step-by-step setup for everything needed to run the Courier Booking System on Windows 11. Skip a section if the tool is already installed — each section ends with a verification command.
+Step-by-step setup for running ShipDesk locally on Windows 11. Skip a section if the tool is already installed.
 
 ---
 
 ## 1. Java 17 (JDK)
 
-> Note: this machine already has a newer JDK installed (25) which is **not** compatible with the Lombok version pinned in `pom.xml`. Install JDK 17 specifically and point this project at it.
+The backend targets Java 17. Production runs JDK 25, but dev uses 17.
 
 1. Download **Eclipse Temurin 17 (LTS)**: https://adoptium.net/temurin/releases/?version=17 → pick `.msi` for Windows x64.
 2. Run the installer. On the "Custom Setup" screen, enable:
@@ -17,12 +17,12 @@ Step-by-step setup for everything needed to run the Courier Booking System on Wi
    java -version
    ```
    Expect `openjdk version "17.0.x"`.
-4. If you have multiple JDKs installed (like the JDK 25 here) and `java -version` shows the wrong one, set `JAVA_HOME` explicitly for this project:
+4. If you have multiple JDKs and `java -version` shows the wrong one, set `JAVA_HOME` for this project:
    ```powershell
    $env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-17.0.x-hotspot"
    $env:Path = "$env:JAVA_HOME\bin;" + $env:Path
    ```
-   Add this to your PowerShell profile (`notepad $PROFILE`) to make it permanent, or set it as a Windows environment variable via System Properties → Environment Variables.
+   Add this to your PowerShell profile (`notepad $PROFILE`) to persist it.
 
 ---
 
@@ -51,22 +51,21 @@ Step-by-step setup for everything needed to run the Courier Booking System on Wi
 
 ---
 
-## 4. PostgreSQL 16
+## 4. PostgreSQL (16+)
+
+Production runs PostgreSQL 18, but any version 14+ works for local dev.
 
 1. Download the installer from https://www.postgresql.org/download/windows/ (EDB installer).
 2. Run it and follow the wizard:
-   - Installation directory: default is fine.
    - Components: keep PostgreSQL Server, pgAdmin 4, Command Line Tools checked.
-   - Data directory: default is fine.
    - **Superuser (postgres) password**: set one and remember it.
    - Port: keep default `5432`.
-   - Locale: default.
-3. Finish the install (skip Stack Builder unless you need extra tools).
-4. Verify the service is running — open **Services** (`services.msc`) and confirm `postgresql-x64-16` is "Running". Or from PowerShell:
+3. Finish the install (skip Stack Builder).
+4. Verify the service is running:
    ```powershell
-   Get-Service postgresql-x64-16
+   Get-Service postgresql*
    ```
-5. Add PostgreSQL's `bin` folder to PATH if `psql` isn't recognized (usually `C:\Program Files\PostgreSQL\16\bin`).
+5. Add PostgreSQL's `bin` folder to PATH if `psql` isn't recognized (e.g. `C:\Program Files\PostgreSQL\16\bin`).
 6. Create the app database and user — open a terminal and connect as the superuser:
    ```powershell
    psql -U postgres
@@ -119,45 +118,53 @@ You can also just open the whole `CourierApp` folder in VS Code if you'd rather 
 
 ---
 
-## 7. Putting it together — first run checklist
+## 7. First Run Checklist
 
 ```powershell
 # 1. Verify tool versions
 java -version      # 17.0.x
 mvn -v             # reports Java 17
-node -v             # v18+ or v20 LTS
-psql --version      # 16.x
+node -v            # v18+ or v20 LTS
+psql --version     # 16.x or 18.x
 
-# 2. Confirm DB + user exist (from step 4)
+# 2. Create DB (first time only)
+psql -U postgres
+# Then in psql:
+# CREATE USER courier_app WITH PASSWORD 'Courier@123';
+# CREATE DATABASE courierdb OWNER courier_app;
 
-# 3. Backend
+# 3. Start backend (set env vars first)
 cd D:\Application\CourierApp\backend
 $env:DB_USERNAME = "courier_app"
-$env:DB_PASSWORD = "change_me"
-$env:JWT_SECRET = "replace-with-a-long-random-string"
+$env:DB_PASSWORD = "Courier@123"
+$env:JWT_SECRET = "replace-with-a-long-random-string-32-chars-min"
+$env:REDIS_HOST = "localhost"
+$env:REDIS_PORT = "6379"
 $env:CORS_ORIGINS = "http://localhost:5173"
 mvn spring-boot:run
-# Wait for "Started CourierApplication" — API live at http://localhost:8080/api
-# Swagger UI: http://localhost:8080/api/swagger-ui.html
+# Wait for "Started CourierApplication"
+# API: http://localhost:8080/api
+# Swagger: http://localhost:8080/api/swagger-ui.html
 
-# 4. Frontend (separate terminal)
+# 4. Start frontend (separate terminal)
 cd D:\Application\CourierApp\frontend
 npm install
 npm run dev
-# App live at http://localhost:5173 — log in with admin / Admin@123
+# App: http://localhost:5173
 ```
 
-> PowerShell note: `export VAR=value` (bash syntax in the original README) doesn't work in PowerShell — use `$env:VAR = "value"` as shown above for each new terminal session, or set them permanently via System Properties → Environment Variables so you don't have to re-set them every time.
+> In PowerShell, use `$env:VAR = "value"` (not `export VAR=value`). Set them as Windows System environment variables to avoid re-setting each session.
 
 ---
 
-## Troubleshooting quick reference
+## Troubleshooting
 
 | Symptom | Fix |
 |---|---|
 | `mvn` reports wrong Java version | Re-check `JAVA_HOME` points at JDK 17, open a fresh terminal |
-| Lombok compile errors (`ExceptionInInitializerError`, `TypeTag :: UNKNOWN`) | You're compiling with a JDK newer than Lombok supports (this happened with JDK 25 on this machine) — switch to JDK 17 via `JAVA_HOME` |
-| Backend fails to start: `Connection refused` to PostgreSQL | Confirm the `postgresql-x64-16` Windows service is running and port 5432 isn't blocked |
-| Backend fails to start: `password authentication failed` | Re-check `DB_USERNAME`/`DB_PASSWORD` match what you created in step 4 |
-| Frontend shows network errors calling the API | Confirm backend is running on 8080 and `CORS_ORIGINS` includes `http://localhost:5173` |
-| `npm install` errors about Node version | Confirm `node -v` is 18+; reinstall Node LTS if older |
+| Lombok compile errors (`TypeTag :: UNKNOWN`) | Compiling with JDK 25+ — switch to JDK 17 via `JAVA_HOME` |
+| Backend: `Connection refused` to PostgreSQL | Confirm `postgresql-*` Windows service is Running, port 5432 open |
+| Backend: `password authentication failed` | DB_USERNAME/DB_PASSWORD mismatch — re-check values |
+| Backend: `Unable to start Redis` | Ensure Redis service is running on port 6379 |
+| Frontend network errors | Backend not on 8080, or `CORS_ORIGINS` missing `http://localhost:5173` |
+| `npm install` Node version error | Confirm `node -v` is 18+; reinstall Node LTS |

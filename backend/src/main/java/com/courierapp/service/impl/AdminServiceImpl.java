@@ -51,6 +51,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 @Slf4j
 @Service
@@ -142,7 +144,7 @@ public class AdminServiceImpl implements AdminService {
         role.setSystemRole(false);
         role.setPermissions(resolvePermissions(request.permissionIds()));
         Role saved = roleRepository.save(role);
-        auditLogService.log("ROLE", "CREATE", saved.getId(), saved.getName(), "admin",
+        auditLogService.log("ROLE", "CREATE", saved.getId(), saved.getName(), currentUsername(),
                 "Permissions: " + request.permissionIds());
         return toRoleResponse(saved);
     }
@@ -159,7 +161,7 @@ public class AdminServiceImpl implements AdminService {
         role.setDescription(request.description());
         role.setPermissions(resolvePermissions(request.permissionIds()));
         Role saved = roleRepository.save(role);
-        auditLogService.log("ROLE", "UPDATE", saved.getId(), saved.getName(), "admin",
+        auditLogService.log("ROLE", "UPDATE", saved.getId(), saved.getName(), currentUsername(),
                 "Permissions updated");
         return toRoleResponse(saved);
     }
@@ -172,7 +174,7 @@ public class AdminServiceImpl implements AdminService {
         }
         String name = role.getName();
         roleRepository.delete(role);
-        auditLogService.log("ROLE", "DELETE", id, name, "admin", null);
+        auditLogService.log("ROLE", "DELETE", id, name, currentUsername(), null);
     }
 
     // ----- Users -----
@@ -213,7 +215,7 @@ public class AdminServiceImpl implements AdminService {
         user.setDepartment(resolveDepartment(request.departmentId()));
         user.setCompany(resolveCompany(request.companyId()));
         User saved = userRepository.save(user);
-        auditLogService.log("USER", "CREATE", saved.getId(), saved.getUsername(), "admin",
+        auditLogService.log("USER", "CREATE", saved.getId(), saved.getUsername(), currentUsername(),
                 "Email=" + saved.getEmail() + ", department=" + (saved.getDepartment() != null ? saved.getDepartment().getName() : "none"));
         return toUserResponse(saved);
     }
@@ -246,14 +248,14 @@ public class AdminServiceImpl implements AdminService {
         }
         if (StringUtils.hasText(request.password())) {
             user.setPasswordHash(passwordEncoder.encode(request.password()));
-            auditLogService.log("USER", "PASSWORD_CHANGE", user.getId(), user.getUsername(), "admin", null);
+            auditLogService.log("USER", "PASSWORD_CHANGE", user.getId(), user.getUsername(), currentUsername(), null);
         }
         user.setRoles(resolveRoles(request.roleIds()));
         user.setDirectPermissions(resolvePermissions(request.directPermissionIds()));
         user.setDepartment(resolveDepartment(request.departmentId()));
         user.setCompany(resolveCompany(request.companyId()));
         User saved = userRepository.save(user);
-        auditLogService.log("USER", "UPDATE", saved.getId(), saved.getUsername(), "admin",
+        auditLogService.log("USER", "UPDATE", saved.getId(), saved.getUsername(), currentUsername(),
                 "active=" + saved.isActive() + ", department=" + (saved.getDepartment() != null ? saved.getDepartment().getName() : "none"));
         return toUserResponse(saved);
     }
@@ -266,40 +268,7 @@ public class AdminServiceImpl implements AdminService {
         }
         String username = user.getUsername();
         userRepository.delete(user);
-        auditLogService.log("USER", "DELETE", id, username, "admin", null);
-    }
-
-    // ----- MFA admin management -----
-
-    @Override
-    @Transactional(readOnly = true)
-    public com.courierapp.dto.PageResponse<com.courierapp.dto.admin.UserMfaStatusResponse> listUserMfaStatus(
-            String search, org.springframework.data.domain.Pageable pageable) {
-        org.springframework.data.domain.Page<User> page = StringUtils.hasText(search)
-                ? userRepository.findByUsernameContainingIgnoreCaseOrFullNameContainingIgnoreCase(search, search, pageable)
-                : userRepository.findAll(pageable);
-        return com.courierapp.dto.PageResponse.of(page.map(u -> new com.courierapp.dto.admin.UserMfaStatusResponse(
-                u.getId(), u.getUsername(), u.getFullName(), u.getEmail(),
-                u.isMfaEnabled(), u.getMfaSecret() != null)));
-    }
-
-    @Override
-    public void adminDisableMfa(Long userId) {
-        User user = findUser(userId);
-        user.setMfaEnabled(false);
-        userRepository.save(user);
-        auditLogService.log("AUTH", "MFA_DISABLED_BY_ADMIN", user.getId(), user.getUsername(), "admin", null);
-        log.info("Admin disabled MFA for user '{}'", user.getUsername());
-    }
-
-    @Override
-    public void adminResetMfa(Long userId) {
-        User user = findUser(userId);
-        user.setMfaEnabled(false);
-        user.setMfaSecret(null);
-        userRepository.save(user);
-        auditLogService.log("AUTH", "MFA_RESET_BY_ADMIN", user.getId(), user.getUsername(), "admin", null);
-        log.info("Admin reset MFA for user '{}'", user.getUsername());
+        auditLogService.log("USER", "DELETE", id, username, currentUsername(), null);
     }
 
     // ----- Approval routing -----
@@ -316,7 +285,7 @@ public class AdminServiceImpl implements AdminService {
         ApprovalRouting routing = new ApprovalRouting();
         applyRouting(routing, request);
         ApprovalRouting saved = approvalRoutingRepository.save(routing);
-        auditLogService.log("APPROVAL_ROUTING", "CREATE", saved.getId(), "module=" + saved.getModule(), "admin",
+        auditLogService.log("APPROVAL_ROUTING", "CREATE", saved.getId(), "module=" + saved.getModule(), currentUsername(),
                 "role=" + (saved.getRole() != null ? saved.getRole().getName() : "") +
                 ", user=" + (saved.getUser() != null ? saved.getUser().getUsername() : ""));
         return toRoutingResponse(saved);
@@ -329,7 +298,7 @@ public class AdminServiceImpl implements AdminService {
                 .orElseThrow(() -> new ResourceNotFoundException("Approval routing", id));
         applyRouting(routing, request);
         ApprovalRouting saved = approvalRoutingRepository.save(routing);
-        auditLogService.log("APPROVAL_ROUTING", "UPDATE", saved.getId(), "module=" + saved.getModule(), "admin", null);
+        auditLogService.log("APPROVAL_ROUTING", "UPDATE", saved.getId(), "module=" + saved.getModule(), currentUsername(), null);
         return toRoutingResponse(saved);
     }
 
@@ -338,7 +307,7 @@ public class AdminServiceImpl implements AdminService {
         ApprovalRouting routing = approvalRoutingRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Approval routing", id));
         approvalRoutingRepository.delete(routing);
-        auditLogService.log("APPROVAL_ROUTING", "DELETE", id, "id=" + id, "admin", null);
+        auditLogService.log("APPROVAL_ROUTING", "DELETE", id, "id=" + id, currentUsername(), null);
     }
 
     private void validateRouting(ApprovalRoutingRequest request) {
@@ -513,7 +482,7 @@ public class AdminServiceImpl implements AdminService {
         s.setLinkedParty(savedParty);
         CompanySettings saved = companySettingsRepository.save(s);
         log.info("Company settings saved id={}, linked party id={}", saved.getId(), savedParty.getId());
-        auditLogService.log("COMPANY", "UPDATE", saved.getId(), req.companyName(), "admin",
+        auditLogService.log("COMPANY", "UPDATE", saved.getId(), req.companyName(), currentUsername(),
                 "Address: " + req.city() + ", " + req.pincode());
         return toSettingsResponse(saved);
     }
@@ -722,7 +691,7 @@ public class AdminServiceImpl implements AdminService {
         cw.setActive(req.active());
         CourierWay saved = courierWayRepository.save(cw);
         log.info("Courier way created: id={}, name={}", saved.getId(), saved.getName());
-        auditLogService.log("COURIER_WAY", "CREATE", saved.getId(), saved.getName(), "admin", null);
+        auditLogService.log("COURIER_WAY", "CREATE", saved.getId(), saved.getName(), currentUsername(), null);
         return toCourierWayResponse(saved);
     }
 
@@ -739,7 +708,7 @@ public class AdminServiceImpl implements AdminService {
         cw.setName(req.name().toUpperCase());
         cw.setActive(req.active());
         CourierWay saved = courierWayRepository.save(cw);
-        auditLogService.log("COURIER_WAY", "UPDATE", saved.getId(), saved.getName(), "admin",
+        auditLogService.log("COURIER_WAY", "UPDATE", saved.getId(), saved.getName(), currentUsername(),
                 "active=" + saved.isActive());
         return toCourierWayResponse(saved);
     }
@@ -752,7 +721,7 @@ public class AdminServiceImpl implements AdminService {
                 .orElseThrow(() -> new ResourceNotFoundException("Courier way", id));
         String name = cw.getName();
         courierWayRepository.delete(cw);
-        auditLogService.log("COURIER_WAY", "DELETE", id, name, "admin", null);
+        auditLogService.log("COURIER_WAY", "DELETE", id, name, currentUsername(), null);
     }
 
     private CourierWayResponse toCourierWayResponse(CourierWay cw) {
@@ -789,7 +758,7 @@ public class AdminServiceImpl implements AdminService {
         pt.setActive(req.active());
         PackageType saved = packageTypeRepository.save(pt);
         log.info("Package type created id={}", saved.getId());
-        auditLogService.log("PACKAGE_TYPE", "CREATE", saved.getId(), saved.getName(), "admin", null);
+        auditLogService.log("PACKAGE_TYPE", "CREATE", saved.getId(), saved.getName(), currentUsername(), null);
         return toPackageTypeResponse(saved);
     }
 
@@ -806,7 +775,7 @@ public class AdminServiceImpl implements AdminService {
         pt.setName(req.name().toUpperCase());
         pt.setActive(req.active());
         PackageType saved = packageTypeRepository.save(pt);
-        auditLogService.log("PACKAGE_TYPE", "UPDATE", saved.getId(), saved.getName(), "admin",
+        auditLogService.log("PACKAGE_TYPE", "UPDATE", saved.getId(), saved.getName(), currentUsername(),
                 "active=" + saved.isActive());
         return toPackageTypeResponse(saved);
     }
@@ -819,7 +788,7 @@ public class AdminServiceImpl implements AdminService {
                 .orElseThrow(() -> new ResourceNotFoundException("Package type", id));
         String name = pt.getName();
         packageTypeRepository.delete(pt);
-        auditLogService.log("PACKAGE_TYPE", "DELETE", id, name, "admin", null);
+        auditLogService.log("PACKAGE_TYPE", "DELETE", id, name, currentUsername(), null);
     }
 
     private PackageTypeResponse toPackageTypeResponse(PackageType pt) {
@@ -853,7 +822,7 @@ public class AdminServiceImpl implements AdminService {
         d.setName(req.name());
         d.setActive(req.active());
         Department saved = departmentRepository.save(d);
-        auditLogService.log("DEPARTMENT", "CREATE", saved.getId(), saved.getName(), "admin", null);
+        auditLogService.log("DEPARTMENT", "CREATE", saved.getId(), saved.getName(), currentUsername(), null);
         return toDeptResponse(saved);
     }
 
@@ -869,7 +838,7 @@ public class AdminServiceImpl implements AdminService {
         d.setName(req.name());
         d.setActive(req.active());
         Department saved = departmentRepository.save(d);
-        auditLogService.log("DEPARTMENT", "UPDATE", saved.getId(), saved.getName(), "admin",
+        auditLogService.log("DEPARTMENT", "UPDATE", saved.getId(), saved.getName(), currentUsername(),
                 "active=" + saved.isActive());
         return toDeptResponse(saved);
     }
@@ -882,7 +851,7 @@ public class AdminServiceImpl implements AdminService {
                 .orElseThrow(() -> new ResourceNotFoundException("Department", id));
         String name = d.getName();
         departmentRepository.delete(d);
-        auditLogService.log("DEPARTMENT", "DELETE", id, name, "admin", null);
+        auditLogService.log("DEPARTMENT", "DELETE", id, name, currentUsername(), null);
     }
 
     private DepartmentResponse toDeptResponse(Department d) {
@@ -917,7 +886,7 @@ public class AdminServiceImpl implements AdminService {
                 .active(req.active())
                 .build();
         Company saved = companyRepository.save(c);
-        auditLogService.log("COMPANY", "CREATE", saved.getId(), saved.getCompanyCode() + " " + saved.getName(), "admin", null);
+        auditLogService.log("COMPANY", "CREATE", saved.getId(), saved.getCompanyCode() + " " + saved.getName(), currentUsername(), null);
         return toCompanyResponse(saved);
     }
 
@@ -948,7 +917,7 @@ public class AdminServiceImpl implements AdminService {
         c.setName(req.name());
         c.setActive(req.active());
         Company saved = companyRepository.save(c);
-        auditLogService.log("COMPANY", "UPDATE", saved.getId(), saved.getCompanyCode() + " " + saved.getName(), "admin",
+        auditLogService.log("COMPANY", "UPDATE", saved.getId(), saved.getCompanyCode() + " " + saved.getName(), currentUsername(),
                 "active=" + saved.isActive());
         return toCompanyResponse(saved);
     }
@@ -960,7 +929,7 @@ public class AdminServiceImpl implements AdminService {
                 .orElseThrow(() -> new ResourceNotFoundException("Company", id));
         String name = c.getCompanyCode() + " " + c.getName();
         companyRepository.delete(c);
-        auditLogService.log("COMPANY", "DELETE", id, name, "admin", null);
+        auditLogService.log("COMPANY", "DELETE", id, name, currentUsername(), null);
     }
 
     private CompanyResponse toCompanyResponse(Company c) {
@@ -1052,5 +1021,10 @@ public class AdminServiceImpl implements AdminService {
         }
         stickerFieldConfigRepository.saveAll(entities);
         return getStickerFieldConfig(companyId);
+    }
+
+    private String currentUsername() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return (auth != null && auth.isAuthenticated()) ? auth.getName() : "system";
     }
 }

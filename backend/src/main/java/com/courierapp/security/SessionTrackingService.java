@@ -33,7 +33,7 @@ public class SessionTrackingService {
         this.jwtService = jwtService;
     }
 
-    public void registerSession(Long userId, String username, String accessToken) {
+    public void registerSession(Long userId, String username, String accessToken, String refreshToken) {
         try {
             io.jsonwebtoken.Claims claims = jwtService.parse(accessToken);
             Date expiry = claims.getExpiration();
@@ -43,6 +43,7 @@ public class SessionTrackingService {
             String key = PREFIX + userId;
             Map<String, String> fields = new HashMap<>();
             fields.put("accessToken", accessToken);
+            fields.put("refreshToken", refreshToken != null ? refreshToken : "");
             fields.put("username", username);
             fields.put("userId", String.valueOf(userId));
             fields.put("loginAt", Instant.now().toString());
@@ -96,18 +97,28 @@ public class SessionTrackingService {
         String key = PREFIX + userId;
         try {
             Object tokenObj = redisTemplate.opsForHash().get(key, "accessToken");
-            Object expiryObj = redisTemplate.opsForHash().get(key, "expiry");
-            if (tokenObj != null) {
-                Date expiry = expiryObj != null
-                        ? Date.from(Instant.parse((String) expiryObj))
-                        : new Date(System.currentTimeMillis() + 86_400_000L);
-                blacklistService.blacklist((String) tokenObj, expiry);
-                log.info("Admin terminated session for userId={}", userId);
-            }
+            Object refreshObj = redisTemplate.opsForHash().get(key, "refreshToken");
+            blacklistTokenByJti((String) tokenObj);
+            blacklistTokenByJti((String) refreshObj);
+            log.info("Admin terminated session for userId={}", userId);
             return Boolean.TRUE.equals(redisTemplate.delete(key));
         } catch (Exception ex) {
             log.warn("Failed to terminate session for userId={}: {}", userId, ex.getMessage());
             return false;
+        }
+    }
+
+    private void blacklistTokenByJti(String rawToken) {
+        if (rawToken == null || rawToken.isBlank()) return;
+        try {
+            io.jsonwebtoken.Claims claims = jwtService.parse(rawToken);
+            String jti = claims.getId();
+            Date expiry = claims.getExpiration();
+            if (jti != null && expiry != null) {
+                blacklistService.blacklist(jti, expiry);
+            }
+        } catch (Exception ex) {
+            log.warn("Could not blacklist token JTI: {}", ex.getMessage());
         }
     }
 

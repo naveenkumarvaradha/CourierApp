@@ -1,0 +1,3 @@
+ALTER TABLE users DROP COLUMN IF EXISTS mfa_secret;
+ALTER TABLE users DROP COLUMN IF EXISTS mfa_enabled;
+ALTER TABLE users DROP COLUMN IF EXISTS mfa_forced;

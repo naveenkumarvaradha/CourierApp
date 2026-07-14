@@ -5,7 +5,7 @@ import {
   Link, MenuItem, Paper, Stack, TextField, Typography,
 } from '@mui/material';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
-import { useAuth, MfaRequiredError } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { authApi } from '../api/endpoints';
 import { extractErrorMessage } from '../api/client';
 import type { Company } from '../types';
@@ -37,10 +37,6 @@ export default function LoginPage() {
       await login(companyCode, username, password);
       navigate('/', { replace: true });
     } catch (err) {
-      if (err instanceof MfaRequiredError) {
-        navigate('/mfa-confirm', { state: { mfaPendingToken: err.mfaPendingToken }, replace: true });
-        return;
-      }
       setError(extractErrorMessage(err));
     } finally {
       setLoading(false);

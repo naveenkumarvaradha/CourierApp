@@ -10,8 +10,4 @@ public interface AuthService {
     void forgotPassword(ForgotPasswordRequest request);
     void resetPassword(ResetPasswordRequest request);
     void logout(String token);
-    MfaSetupResponse setupMfa(String username);
-    void enableMfa(String username, String code);
-    void disableMfa(String username);
-    TokenResponse confirmMfa(MfaConfirmRequest request);
 }

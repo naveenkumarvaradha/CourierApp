@@ -15,7 +15,6 @@ import com.courierapp.service.AuditLogService;
 import com.courierapp.service.AuthService;
 import com.courierapp.service.EmailService;
 import com.courierapp.security.SessionTrackingService;
-import com.courierapp.service.MfaService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import lombok.extern.slf4j.Slf4j;
@@ -48,7 +47,6 @@ public class AuthServiceImpl implements AuthService {
     private final AuditLogService auditLogService;
     private final EmailService emailService;
     private final com.courierapp.security.TokenBlacklistService tokenBlacklistService;
-    private final MfaService mfaService;
     private final SessionTrackingService sessionTrackingService;
     private final com.courierapp.security.AccountLockoutService accountLockoutService;
     private final com.courierapp.security.PasswordStrengthValidator passwordStrengthValidator;
@@ -62,7 +60,6 @@ public class AuthServiceImpl implements AuthService {
                            AuditLogService auditLogService,
                            EmailService emailService,
                            com.courierapp.security.TokenBlacklistService tokenBlacklistService,
-                           MfaService mfaService,
                            SessionTrackingService sessionTrackingService,
                            com.courierapp.security.AccountLockoutService accountLockoutService,
                            com.courierapp.security.PasswordStrengthValidator passwordStrengthValidator) {
@@ -75,7 +72,6 @@ public class AuthServiceImpl implements AuthService {
         this.auditLogService = auditLogService;
         this.emailService = emailService;
         this.tokenBlacklistService = tokenBlacklistService;
-        this.mfaService = mfaService;
         this.sessionTrackingService = sessionTrackingService;
         this.accountLockoutService = accountLockoutService;
         this.passwordStrengthValidator = passwordStrengthValidator;
@@ -84,12 +80,10 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional(readOnly = true)
     public TokenResponse login(LoginRequest request) {
-        // Check account lockout before touching DB (fast Redis check)
         if (accountLockoutService.isLocked(request.username())) {
             long secs = accountLockoutService.lockRemainingSeconds(request.username());
             throw new BusinessException("Account is locked. Try again in " + secs + " seconds.", HttpStatus.TOO_MANY_REQUESTS);
         }
-        // Verify company exists and is active
         Company company = companyRepository.findByCompanyCodeIgnoreCase(request.companyCode())
                 .orElseThrow(() -> new BadCredentialsException("Invalid company code or credentials"));
         if (!company.isActive()) {
@@ -100,7 +94,6 @@ public class AuthServiceImpl implements AuthService {
                     new UsernamePasswordAuthenticationToken(request.username(), request.password()));
             AppUserPrincipal principal = (AppUserPrincipal) authentication.getPrincipal();
 
-            // Verify the authenticated user belongs to the selected company
             User user = userRepository.findById(principal.getId())
                     .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
             if (user.getCompany() == null || !user.getCompany().getId().equals(company.getId())) {
@@ -111,14 +104,6 @@ public class AuthServiceImpl implements AuthService {
                 throw new BadCredentialsException("Invalid company code or credentials");
             }
 
-            // If MFA is enabled AND a secret is actually configured, require OTP
-            if (user.isMfaEnabled() && user.getMfaSecret() != null) {
-                String pending = jwtService.generateMfaPendingToken(principal.getUsername(), user.getId());
-                log.info("User '{}' passed password — awaiting MFA confirmation", request.username());
-                return TokenResponse.mfaRequired(pending);
-            }
-
-            // Successful login — clear failure counter
             accountLockoutService.clearFailures(request.username());
             List<String> authorities = principal.getAuthorityStrings().stream().sorted().toList();
             String access = jwtService.generateAccessToken(
@@ -127,9 +112,8 @@ public class AuthServiceImpl implements AuthService {
             log.info("User '{}' logged in under company '{}'", request.username(), company.getCompanyCode());
             auditLogService.log("AUTH", "LOGIN", principal.getId(), principal.getUsername(),
                     principal.getUsername(), "Company: " + company.getCompanyCode());
-            TokenResponse response = TokenResponse.bearer(access, refresh, jwtService.getAccessExpirySeconds());
-            sessionTrackingService.registerSession(principal.getId(), principal.getUsername(), access);
-            return response;
+            sessionTrackingService.registerSession(principal.getId(), principal.getUsername(), access, refresh);
+            return TokenResponse.bearer(access, refresh, jwtService.getAccessExpirySeconds());
         } catch (BadCredentialsException ex) {
             boolean nowLocked = accountLockoutService.recordFailure(request.username());
             log.warn("Failed login attempt for username='{}' company='{}' locked={}", request.username(), request.companyCode(), nowLocked);
@@ -150,6 +134,9 @@ public class AuthServiceImpl implements AuthService {
         }
         if (!jwtService.isRefreshToken(claims)) {
             throw new BusinessException("Provided token is not a refresh token", HttpStatus.UNAUTHORIZED);
+        }
+        if (tokenBlacklistService.isBlacklisted(claims.getId())) {
+            throw new BusinessException("Refresh token has been revoked", HttpStatus.UNAUTHORIZED);
         }
         String username = claims.getSubject();
         User user = userRepository.findByUsername(username)
@@ -180,8 +167,7 @@ public class AuthServiceImpl implements AuthService {
                 company != null ? company.getId() : null,
                 company != null ? company.getCompanyCode() : null,
                 company != null ? company.getName() : null,
-                roles, permissions,
-                user.isMfaEnabled() && user.getMfaSecret() != null);
+                roles, permissions);
     }
 
     @Override
@@ -203,23 +189,20 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void forgotPassword(ForgotPasswordRequest request) {
-        User user = userRepository.findByUsername(request.username())
-                .orElseThrow(() -> new BusinessException("No account found with username '" + request.username() + "'."));
-        if (!user.isActive()) {
-            throw new BusinessException("This account is inactive. Please contact your administrator.");
-        }
-        // Invalidate any existing tokens for this user
-        resetTokenRepository.deleteByUserId(user.getId());
-        // Create new reset token valid for 24 hours
-        String token = UUID.randomUUID().toString();
-        PasswordResetToken prt = PasswordResetToken.builder()
-                .user(user)
-                .token(token)
-                .expiresAt(Instant.now().plus(24, ChronoUnit.HOURS))
-                .build();
-        resetTokenRepository.save(prt);
-        emailService.sendPasswordResetEmail(user.getEmail(), user.getFullName(), token);
-        log.info("Password reset email sent to '{}' for user '{}'", user.getEmail(), user.getUsername());
+        // Always return silently — never reveal whether the username exists
+        userRepository.findByUsername(request.username()).ifPresent(user -> {
+            if (!user.isActive()) return;
+            resetTokenRepository.deleteByUserId(user.getId());
+            String token = UUID.randomUUID().toString();
+            PasswordResetToken prt = PasswordResetToken.builder()
+                    .user(user)
+                    .token(token)
+                    .expiresAt(Instant.now().plus(24, ChronoUnit.HOURS))
+                    .build();
+            resetTokenRepository.save(prt);
+            emailService.sendPasswordResetEmail(user.getEmail(), user.getFullName(), token);
+            log.info("Password reset email sent for user '{}'", user.getUsername());
+        });
     }
 
     @Override
@@ -245,84 +228,14 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    @Transactional
-    public MfaSetupResponse setupMfa(String username) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new ResourceNotFoundException("User", username));
-        MfaService.MfaSetupResult result = mfaService.generateSecret(username);
-        user.setMfaSecret(result.secret());
-        userRepository.save(user);
-        return new MfaSetupResponse(result.qrDataUri(), result.secret());
-    }
-
-    @Override
-    @Transactional
-    public void enableMfa(String username, String code) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new ResourceNotFoundException("User", username));
-        if (user.getMfaSecret() == null) {
-            throw new BusinessException("Call setup-mfa first to generate a secret");
-        }
-        if (!mfaService.verifyCode(user.getMfaSecret(), code)) {
-            throw new BusinessException("Invalid OTP — please scan the QR code again and retry", HttpStatus.UNAUTHORIZED);
-        }
-        user.setMfaEnabled(true);
-        userRepository.save(user);
-        auditLogService.log("AUTH", "MFA_ENABLED", user.getId(), username, username, null);
-        log.info("MFA enabled for user '{}'", username);
-    }
-
-    @Override
-    @Transactional
-    public void disableMfa(String username) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new ResourceNotFoundException("User", username));
-        user.setMfaEnabled(false);
-        user.setMfaSecret(null);
-        userRepository.save(user);
-        auditLogService.log("AUTH", "MFA_DISABLED", user.getId(), username, username, null);
-        log.info("MFA disabled for user '{}'", username);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public TokenResponse confirmMfa(MfaConfirmRequest request) {
-        final Claims claims;
-        try {
-            claims = jwtService.parse(request.mfaPendingToken());
-        } catch (JwtException | IllegalArgumentException ex) {
-            throw new BusinessException("Invalid or expired MFA session — please log in again", HttpStatus.UNAUTHORIZED);
-        }
-        if (!jwtService.isMfaPendingToken(claims)) {
-            throw new BusinessException("Invalid token type", HttpStatus.UNAUTHORIZED);
-        }
-        String username = claims.getSubject();
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new BusinessException("User not found", HttpStatus.UNAUTHORIZED));
-        if (!mfaService.verifyCode(user.getMfaSecret(), request.code())) {
-            auditLogService.log("AUTH", "MFA_FAILED", user.getId(), username, username, "Wrong OTP");
-            throw new BusinessException("Invalid OTP", HttpStatus.UNAUTHORIZED);
-        }
-        AppUserPrincipal principal = new AppUserPrincipal(user);
-        List<String> authorities = principal.getAuthorityStrings().stream().sorted().toList();
-        Long companyId = user.getCompany() != null ? user.getCompany().getId() : null;
-        String access = jwtService.generateAccessToken(username, user.getId(), companyId, authorities);
-        String refresh = jwtService.generateRefreshToken(username, user.getId());
-        auditLogService.log("AUTH", "LOGIN", user.getId(), username, username, "MFA confirmed");
-        log.info("User '{}' completed MFA login", username);
-        TokenResponse response = TokenResponse.bearer(access, refresh, jwtService.getAccessExpirySeconds());
-        sessionTrackingService.registerSession(user.getId(), username, access);
-        return response;
-    }
-
-    @Override
     public void logout(String token) {
         try {
             io.jsonwebtoken.Claims claims = jwtService.parse(token);
             tokenBlacklistService.blacklist(claims.getId(), claims.getExpiration());
             Object userIdClaim = claims.get("uid");
             if (userIdClaim != null) {
-                sessionTrackingService.removeSession(Long.valueOf(userIdClaim.toString()));
+                // Blacklist both access + refresh tokens before removing session
+                sessionTrackingService.terminateSession(Long.valueOf(userIdClaim.toString()));
             }
             log.info("User '{}' logged out — JTI {} blacklisted", claims.getSubject(), claims.getId());
             auditLogService.log("AUTH", "LOGOUT", null, claims.getSubject(), claims.getSubject(), null);

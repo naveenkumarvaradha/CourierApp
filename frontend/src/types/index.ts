@@ -21,22 +21,6 @@ export interface TokenResponse {
   refreshToken: string | null;
   tokenType: string | null;
   expiresIn: number;
-  mfaRequired: boolean;
-  mfaPendingToken: string | null;
-}
-
-export interface MfaSetupResponse {
-  qrDataUri: string;
-  secret: string;
-}
-
-export interface UserMfaStatus {
-  id: number;
-  username: string;
-  fullName: string;
-  email: string;
-  mfaEnabled: boolean;
-  mfaConfigured: boolean;
 }
 
 export interface CurrentUser {
@@ -49,7 +33,6 @@ export interface CurrentUser {
   companyName: string | null;
   roles: string[];
   permissions: string[];
-  mfaEnabled: boolean;
 }
 
 export interface PageResponse<T> {

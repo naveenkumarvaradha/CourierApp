@@ -12,6 +12,5 @@ public record CurrentUserResponse(
         String companyCode,
         String companyName,
         List<String> roles,
-        Set<String> permissions,
-        boolean mfaEnabled
+        Set<String> permissions
 ) {}

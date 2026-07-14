@@ -41,7 +41,7 @@ public class JwtService {
                 .claim("type", "access")
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + accessExpiryMs))
-                .signWith(key)
+                .signWith(key, Jwts.SIG.HS512)
                 .compact();
     }
 
@@ -54,7 +54,7 @@ public class JwtService {
                 .claim("type", "refresh")
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + refreshExpiryMs))
-                .signWith(key)
+                .signWith(key, Jwts.SIG.HS512)
                 .compact();
     }
 
@@ -70,28 +70,12 @@ public class JwtService {
         return resolver.apply(parse(token));
     }
 
-    public String generateMfaPendingToken(String username, Long userId) {
-        Date now = new Date();
-        return Jwts.builder()
-                .subject(username)
-                .claim("uid", userId)
-                .claim("type", "mfa_pending")
-                .issuedAt(now)
-                .expiration(new Date(now.getTime() + 5 * 60_000L)) // 5-minute window to enter OTP
-                .signWith(key)
-                .compact();
-    }
-
     public boolean isAccessToken(Claims claims) {
         return "access".equals(claims.get("type", String.class));
     }
 
     public boolean isRefreshToken(Claims claims) {
         return "refresh".equals(claims.get("type", String.class));
-    }
-
-    public boolean isMfaPendingToken(Claims claims) {
-        return "mfa_pending".equals(claims.get("type", String.class));
     }
 
     public long getAccessExpirySeconds() {

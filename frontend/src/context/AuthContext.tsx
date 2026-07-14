@@ -6,12 +6,6 @@ import { setUser as setUserAction, clearUser, setLoading as setLoadingAction } f
 import { baseApi } from '../store/api/baseApi';
 import type { CurrentUser } from '../types';
 
-export class MfaRequiredError extends Error {
-  constructor(public readonly mfaPendingToken: string) {
-    super('MFA required');
-  }
-}
-
 interface AuthContextValue {
   user: CurrentUser | null;
   loading: boolean;
@@ -53,9 +47,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (companyCode: string, username: string, password: string) => {
     const tokens = await authApi.login(companyCode, username, password);
-    if (tokens.mfaRequired && tokens.mfaPendingToken) {
-      throw new MfaRequiredError(tokens.mfaPendingToken);
-    }
     tokenStore.set(tokens.accessToken!, tokens.refreshToken!);
     const me = await authApi.me();
     setUser(me);

@@ -81,9 +81,10 @@ public class SecurityConfig {
                 .cacheControl(cc -> {})
                 .xssProtection(xss -> xss.headerValue(XXssProtectionHeaderWriter.HeaderValue.ENABLED_MODE_BLOCK))
                 .referrerPolicy(rp -> rp.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000))
                 .addHeaderWriter(new StaticHeadersWriter("Content-Security-Policy",
                     "default-src 'self'; " +
-                    "script-src 'self' 'unsafe-inline'; " +
+                    "script-src 'self'; " +
                     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
                     "font-src 'self' https://fonts.gstatic.com; " +
                     "img-src 'self' data: blob:; " +
@@ -105,7 +106,6 @@ public class SecurityConfig {
                 .requestMatchers(
                     "/auth/login",
                     "/auth/refresh",
-                    "/auth/confirm-mfa",
                     "/auth/companies",
                     "/auth/forgot-password",
                     "/auth/reset-password",
@@ -117,12 +117,12 @@ public class SecurityConfig {
                 .requestMatchers(
                     "/actuator/**"
                 ).hasAuthority("ADMIN_VIEW")
-                // Swagger locked behind auth — only accessible when logged in
+                // Swagger restricted to ADMIN_VIEW only
                 .requestMatchers(
                     "/v3/api-docs/**",
                     "/swagger-ui/**",
                     "/swagger-ui.html"
-                ).authenticated()
+                ).hasAuthority("ADMIN_VIEW")
                 .anyRequest().authenticated())
 
             .addFilterBefore(loginRateLimitFilter, UsernamePasswordAuthenticationFilter.class)

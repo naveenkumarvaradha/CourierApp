@@ -55,12 +55,6 @@ public class User extends Auditable {
     @JoinColumn(name = "company_id")
     private Company company;
 
-    @Column(name = "mfa_secret", length = 64)
-    private String mfaSecret;
-
-    @Column(name = "mfa_enabled", nullable = false)
-    private boolean mfaEnabled;
-
     /** Direct per-user permission grants in addition to those from roles. */
     @Builder.Default
     @ManyToMany(fetch = FetchType.EAGER)

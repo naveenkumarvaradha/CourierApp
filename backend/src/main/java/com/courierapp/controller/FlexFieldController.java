@@ -95,13 +95,13 @@ public class FlexFieldController {
     // ----- Field values (per entity) -----
 
     @GetMapping("/flex-field-values/{module}/{entityId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('BOOKING_VIEW') or hasAuthority('MASTER_VIEW') or hasAuthority('ADMIN_VIEW')")
     public FlexFieldValueResponse getValues(@PathVariable String module, @PathVariable Long entityId) {
         return flexFieldService.getValues(module, entityId);
     }
 
     @PostMapping("/flex-field-values/{module}/{entityId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('BOOKING_UPDATE') or hasAuthority('MASTER_UPDATE') or hasAuthority('ADMIN_UPDATE')")
     public FlexFieldValueResponse saveValues(@PathVariable String module,
                                              @PathVariable Long entityId,
                                              @RequestBody FlexFieldValueRequest request) {

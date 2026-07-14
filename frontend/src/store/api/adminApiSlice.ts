@@ -1,7 +1,7 @@
 import { baseApi } from './baseApi';
 import type {
   CourierWay, PackageType, Department, Role, Permission,
-  UserAccount, ApprovalRouting, CompanySettings, PageResponse, AuditLog, UserMfaStatus,
+  UserAccount, ApprovalRouting, CompanySettings, PageResponse, AuditLog,
 } from '../../types';
 
 export const adminApiSlice = baseApi.injectEndpoints({
@@ -140,19 +140,6 @@ export const adminApiSlice = baseApi.injectEndpoints({
       query: (params) => ({ url: '/admin/audit-logs', params }),
     }),
 
-    // ── MFA Management ────────────────────────────────────────────────────────
-    listUserMfaStatus: build.query<PageResponse<UserMfaStatus>, { search?: string; page?: number; size?: number }>({
-      query: (params) => ({ url: '/admin/users/mfa-status', params }),
-      providesTags: ['UserMfa'],
-    }),
-    adminDisableMfa: build.mutation<void, number>({
-      query: (id) => ({ url: `/admin/users/${id}/mfa/disable`, method: 'POST' }),
-      invalidatesTags: ['UserMfa'],
-    }),
-    adminResetMfa: build.mutation<void, number>({
-      query: (id) => ({ url: `/admin/users/${id}/mfa/reset`, method: 'POST' }),
-      invalidatesTags: ['UserMfa'],
-    }),
   }),
 });
 
@@ -169,5 +156,4 @@ export const {
   useListApprovalRoutingQuery, useCreateApprovalRoutingMutation, useDeleteApprovalRoutingMutation,
   useGetCompanySettingsQuery, useUpdateCompanySettingsMutation,
   useSearchAuditLogsQuery,
-  useListUserMfaStatusQuery, useAdminDisableMfaMutation, useAdminResetMfaMutation,
 } = adminApiSlice;

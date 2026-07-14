@@ -88,33 +88,4 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 
-    // ── MFA endpoints ─────────────────────────────────────────────────────────
-
-    @PostMapping("/setup-mfa")
-    @Operation(summary = "Generate TOTP secret and QR code for the current user")
-    public ResponseEntity<MfaSetupResponse> setupMfa(Authentication authentication) {
-        return ResponseEntity.ok(authService.setupMfa(authentication.getName()));
-    }
-
-    @PostMapping("/enable-mfa")
-    @Operation(summary = "Confirm OTP from Authenticator app to activate MFA on this account")
-    public ResponseEntity<Map<String, String>> enableMfa(
-            @Valid @RequestBody MfaVerifyRequest request,
-            Authentication authentication) {
-        authService.enableMfa(authentication.getName(), request.code());
-        return ResponseEntity.ok(Map.of("message", "MFA enabled successfully"));
-    }
-
-    @PostMapping("/disable-mfa")
-    @Operation(summary = "Disable MFA for the current user")
-    public ResponseEntity<Map<String, String>> disableMfa(Authentication authentication) {
-        authService.disableMfa(authentication.getName());
-        return ResponseEntity.ok(Map.of("message", "MFA disabled"));
-    }
-
-    @PostMapping("/confirm-mfa")
-    @Operation(summary = "Complete login by submitting OTP (called when mfaRequired=true in login response)")
-    public ResponseEntity<TokenResponse> confirmMfa(@Valid @RequestBody MfaConfirmRequest request) {
-        return ResponseEntity.ok(authService.confirmMfa(request));
-    }
 }

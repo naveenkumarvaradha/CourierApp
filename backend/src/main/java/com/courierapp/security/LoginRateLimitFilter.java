@@ -40,10 +40,15 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
 
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
 
+    private static final java.util.Set<String> RATE_LIMITED_PATHS = java.util.Set.of(
+            "/auth/login", "/auth/refresh", "/auth/forgot-password"
+    );
+
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !request.getServletPath().endsWith("/auth/login")
-                || !"POST".equalsIgnoreCase(request.getMethod());
+        if (!"POST".equalsIgnoreCase(request.getMethod())) return true;
+        String path = request.getServletPath();
+        return RATE_LIMITED_PATHS.stream().noneMatch(path::endsWith);
     }
 
     @Override

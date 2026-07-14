@@ -85,6 +85,24 @@ interface ActiveSession {
   expiresInSeconds: string;
 }
 
+function parseUserAgent(ua: string): string {
+  if (!ua) return '';
+  const browser =
+    /Edg\//.test(ua) ? 'Edge' :
+    /OPR\/|Opera/.test(ua) ? 'Opera' :
+    /Chrome\//.test(ua) ? 'Chrome' :
+    /Firefox\//.test(ua) ? 'Firefox' :
+    /Safari\//.test(ua) ? 'Safari' : 'Browser';
+  const os =
+    /Windows NT 10/.test(ua) ? 'Windows 10/11' :
+    /Windows NT/.test(ua) ? 'Windows' :
+    /Mac OS X/.test(ua) ? 'macOS' :
+    /Android/.test(ua) ? 'Android' :
+    /iPhone|iPad/.test(ua) ? 'iOS' :
+    /Linux/.test(ua) ? 'Linux' : '';
+  return os ? `${browser} · ${os}` : browser;
+}
+
 function StatusBadge({ status }: { status: string }) {
   const up = status === 'UP';
   return (
@@ -442,7 +460,7 @@ export default function SystemStatusPage() {
                       <TableCell>User</TableCell>
                       <TableCell>User ID</TableCell>
                       <TableCell>Login Time</TableCell>
-                      <TableCell>IP Address</TableCell>
+                      <TableCell>IP / Device</TableCell>
                       <TableCell>Session Expires</TableCell>
                       <TableCell align="right">Action</TableCell>
                     </TableRow>
@@ -470,9 +488,14 @@ export default function SystemStatusPage() {
                           {s.loginAt ? new Date(s.loginAt).toLocaleString() : '—'}
                         </TableCell>
                         <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <LanIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                            <Typography variant="caption" fontFamily="monospace">{s.ip}</Typography>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <LanIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
+                              <Typography variant="caption" fontFamily="monospace">{s.ip}</Typography>
+                            </Box>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>
+                              {parseUserAgent(s.userAgent)}
+                            </Typography>
                           </Box>
                         </TableCell>
                         <TableCell sx={{ fontSize: 12 }}>

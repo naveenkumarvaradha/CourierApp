@@ -67,7 +67,17 @@
       "PowerShell(Get-Content \"C:\\\\Program Files\\\\PostgreSQL\\\\15\\\\data\\\\pg_hba.conf\" | Where-Object { $_ -notmatch \"^#\" -and $_.Trim\\(\\) -ne \"\" })",
       "PowerShell(Get-Content \"C:\\\\CourierService\\\\CourierBackend.out.log\" | Select-String \"datasource|jdbc|url|password|profile|config|properties\" | Select-Object -First 20 | ForEach-Object { $_.Line })",
       "PowerShell(Get-Content \"C:\\\\CourierService\\\\CourierBackend.out.log\" | Select-String \"datasource|password|jdbc|config|properties|Courier\" | Select-Object -First 20 | ForEach-Object { $_.Line })",
-      "PowerShell(Get-Content \"C:\\\\CourierService\\\\CourierBackend.out.log\" | Select-Object -Last 40 | Select-String \"started by|password|FATAL|Started|Starting|datasource\" | ForEach-Object { $_.Line })"
+      "PowerShell(Get-Content \"C:\\\\CourierService\\\\CourierBackend.out.log\" | Select-Object -Last 40 | Select-String \"started by|password|FATAL|Started|Starting|datasource\" | ForEach-Object { $_.Line })",
+      "mcp__claude-in-chrome__list_connected_browsers",
+      "mcp__claude-in-chrome__tabs_context_mcp",
+      "mcp__claude-in-chrome__navigate",
+      "mcp__claude-in-chrome__computer",
+      "mcp__claude-in-chrome__read_page",
+      "mcp__claude-in-chrome__find",
+      "mcp__claude-in-chrome__file_upload",
+      "Bash(cp \"C:/Users/naveenkumarv/Videos/Naveenkumar_V-ERP_Implementation_Specialist .pdf\" \"/c/Users/naveenkumarv/AppData/Local/Temp/claude/D--Application-CourierApp/1defe136-28f8-4033-b1ce-028e8051b628/scratchpad/Naveenkumar_V-ERP_Implementation_Specialist.pdf\" 2>&1 || echo \"FAILED\")",
+      "Bash(ls -la \"/c/Users/naveenkumarv/AppData/Local/Temp/claude/D--Application-CourierApp/1defe136-28f8-4033-b1ce-028e8051b628/scratchpad/\" 2>&1)",
+      "WebSearch"
     ]
   }
 }

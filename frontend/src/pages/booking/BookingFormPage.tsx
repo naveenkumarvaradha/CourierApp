@@ -19,7 +19,6 @@ import BusinessIcon from '@mui/icons-material/Business';
 import { adminApi, approvalApi, bookingApi, flexFieldApi, partyApi } from '../../api/endpoints';
 import { extractErrorMessage } from '../../api/client';
 import { useNotification } from '../../context/NotificationContext';
-import { useAuth } from '../../context/AuthContext';
 import FlexFieldsSection from '../../components/FlexFieldsSection';
 import type { ApprovalInfo, Booking, CompanySettings, CourierWay, FlexFieldValues, PackageType, Party } from '../../types';
 
@@ -73,7 +72,6 @@ export default function BookingFormPage() {
   const viewMode = searchParams.get('view') === '1';
   const navigate = useNavigate();
   const { notify } = useNotification();
-  const { user } = useAuth();
   const [parties, setParties] = useState<Party[]>([]);
   const [courierWays, setCourierWays] = useState<CourierWay[]>([]);
   const [packageTypes, setPackageTypes] = useState<PackageType[]>([]);
@@ -98,12 +96,8 @@ export default function BookingFormPage() {
     adminApi.listActiveCourierWays().then(setCourierWays).catch(() => undefined);
     adminApi.listActivePackageTypes().then(setPackageTypes).catch(() => undefined);
     // Load sender address from the logged-in user's own company
-    if (user?.companyId) {
-      adminApi.getCompanySettingsById(user.companyId).then(setCompany).catch(() => undefined);
-    } else {
-      adminApi.getCompanySettings().then(setCompany).catch(() => undefined);
-    }
-  }, [user?.companyId]);
+    bookingApi.myCompanySettings().then(setCompany).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (id) {

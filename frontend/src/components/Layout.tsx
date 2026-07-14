@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useLocation } from 'react-router-dom';
 import {
   AppBar, Avatar, Box, Button, Chip, Divider, Drawer,
   IconButton, List, ListItemButton, ListItemIcon, ListItemText,
@@ -28,7 +28,6 @@ import EmailIcon from '@mui/icons-material/Email';
 import MonitorHeartIcon from '@mui/icons-material/MonitorHeart';
 import EventRepeatIcon from '@mui/icons-material/EventRepeat';
 import HourglassTopIcon from '@mui/icons-material/HourglassTop';
-import PhonelinkLockIcon from '@mui/icons-material/PhonelinkLock';
 import PersonIcon from '@mui/icons-material/Person';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import { useAuth } from '../context/AuthContext';
@@ -48,7 +47,6 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Approval Center',  to: '/approval-center',           icon: <HourglassTopIcon />,   permissions: [],               group: 'General' },
   { label: 'Users',            to: '/admin/users',               icon: <PeopleIcon />,         permissions: ['ADMIN_VIEW'],   group: 'Admin' },
   { label: 'Roles',            to: '/admin/roles',               icon: <SecurityIcon />,       permissions: ['ADMIN_VIEW'],   group: 'Admin' },
-  { label: 'MFA Management',   to: '/admin/mfa-management',      icon: <PhonelinkLockIcon />,  permissions: ['ADMIN_VIEW'],   group: 'Admin' },
   { label: 'Approval Routing', to: '/admin/approval-routing',    icon: <RuleIcon />,           permissions: ['ADMIN_VIEW'],   group: 'Admin' },
   { label: 'Departments',      to: '/admin/departments',         icon: <DomainIcon />,         permissions: ['ADMIN_VIEW'],   group: 'Admin' },
   { label: 'Courier Ways',     to: '/admin/courier-ways',        icon: <AltRouteIcon />,       permissions: ['ADMIN_VIEW'],   group: 'Admin' },
@@ -71,7 +69,6 @@ const DRAWER_WIDTH = 272;
 export default function Layout() {
   const { user, logout, hasAnyPermission } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -202,12 +199,6 @@ export default function Layout() {
           <ListItemIcon sx={{ minWidth: 36 }}><LockIcon fontSize="small" /></ListItemIcon>
           <ListItemText primary="Change Password" primaryTypographyProps={{ fontSize: 13 }} />
         </ListItemButton>
-        {user?.mfaEnabled && (
-          <ListItemButton onClick={() => { setDrawerOpen(false); navigate('/profile/mfa'); }} sx={{ mx: 1.5, borderRadius: 2 }}>
-            <ListItemIcon sx={{ minWidth: 36 }}><PhonelinkLockIcon fontSize="small" /></ListItemIcon>
-            <ListItemText primary="Two-Factor Auth" primaryTypographyProps={{ fontSize: 13 }} />
-          </ListItemButton>
-        )}
         <ListItemButton onClick={() => { setDrawerOpen(false); logout(); }} sx={{ mx: 1.5, borderRadius: 2, color: 'error.main' }}>
           <ListItemIcon sx={{ minWidth: 36, color: 'error.main' }}><LogoutIcon fontSize="small" /></ListItemIcon>
           <ListItemText primary="Sign Out" primaryTypographyProps={{ fontSize: 13 }} />
@@ -429,16 +420,6 @@ export default function Layout() {
               <PersonIcon fontSize="small" sx={{ color: 'text.secondary' }} />
               Change Password
             </MenuItem>
-            {user?.mfaEnabled && (
-              <MenuItem
-                onClick={() => { setUserAnchor(null); navigate('/profile/mfa'); }}
-                sx={{ borderRadius: 2, gap: 1.5, py: 1, px: 1.5, fontSize: 13.5 }}
-              >
-                <PhonelinkLockIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                Two-Factor Auth (MFA)
-              </MenuItem>
-            )}
-
             <Divider sx={{ my: 0.5 }} />
 
             <MenuItem

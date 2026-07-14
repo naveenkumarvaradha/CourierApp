@@ -25,11 +25,6 @@ public interface AdminService {
     UserResponse updateUser(Long id, UserUpdateRequest request);
     void deleteUser(Long id);
 
-    // MFA admin management
-    PageResponse<UserMfaStatusResponse> listUserMfaStatus(String search, Pageable pageable);
-    void adminDisableMfa(Long userId);
-    void adminResetMfa(Long userId);
-
     // Approval routing
     List<ApprovalRoutingResponse> listApprovalRouting();
     ApprovalRoutingResponse createApprovalRouting(ApprovalRoutingRequest request);

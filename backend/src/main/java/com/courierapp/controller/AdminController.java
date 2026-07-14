@@ -120,33 +120,6 @@ public class AdminController {
         return ResponseEntity.noContent().build();
     }
 
-    // ----- MFA Admin Management -----
-
-    @GetMapping("/users/mfa-status")
-    @PreAuthorize("hasAuthority('ADMIN_VIEW')")
-    @Operation(summary = "List all users with their MFA status")
-    public PageResponse<com.courierapp.dto.admin.UserMfaStatusResponse> listUserMfaStatus(
-            @RequestParam(required = false) String search,
-            @PageableDefault(size = 20, sort = "username") Pageable pageable) {
-        return adminService.listUserMfaStatus(search, pageable);
-    }
-
-    @PostMapping("/users/{id}/mfa/disable")
-    @PreAuthorize("hasAuthority('ADMIN_UPDATE')")
-    @Operation(summary = "Disable MFA for a specific user (keeps secret)")
-    public ResponseEntity<Void> adminDisableMfa(@PathVariable Long id) {
-        adminService.adminDisableMfa(id);
-        return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/users/{id}/mfa/reset")
-    @PreAuthorize("hasAuthority('ADMIN_UPDATE')")
-    @Operation(summary = "Reset MFA for a specific user (disable + clear secret)")
-    public ResponseEntity<Void> adminResetMfa(@PathVariable Long id) {
-        adminService.adminResetMfa(id);
-        return ResponseEntity.noContent().build();
-    }
-
     // ----- Approval routing -----
 
     @GetMapping("/approval-routing")
@@ -240,8 +213,7 @@ public class AdminController {
             return ResponseEntity.ok(java.util.Map.of("message", "Test email sent successfully to " + toEmail));
         } catch (Exception e) {
             log.error("Test mail failed to {}: {}", toEmail, e.getMessage());
-            String msg = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
-            return ResponseEntity.status(500).body(java.util.Map.of("message", "SMTP Error: " + msg));
+            return ResponseEntity.status(500).body(java.util.Map.of("message", "Failed to send test email. Check SMTP settings."));
         }
     }
 
@@ -422,11 +394,25 @@ public class AdminController {
             @PathVariable Long id,
             @RequestParam("file") MultipartFile file) {
         try {
-            adminService.saveCompanyLogo(id, file.getBytes(), file.getContentType());
+            String contentType = file.getContentType();
+            if (contentType == null || !java.util.Set.of("image/png", "image/jpeg", "image/gif", "image/webp")
+                    .contains(contentType.toLowerCase())) {
+                return ResponseEntity.badRequest().body(java.util.Map.of("message", "Only PNG, JPEG, GIF, or WebP images are allowed"));
+            }
+            if (file.getSize() > 2 * 1024 * 1024) {
+                return ResponseEntity.badRequest().body(java.util.Map.of("message", "Logo file must be under 2 MB"));
+            }
+            // Detect actual content type from magic bytes, ignore client-supplied value
+            byte[] bytes = file.getBytes();
+            String safeContentType = detectImageContentType(bytes);
+            if (safeContentType == null) {
+                return ResponseEntity.badRequest().body(java.util.Map.of("message", "File does not appear to be a valid image"));
+            }
+            adminService.saveCompanyLogo(id, bytes, safeContentType);
             return ResponseEntity.ok(java.util.Map.of("message", "Logo uploaded successfully"));
         } catch (Exception e) {
             log.error("Logo upload failed for company {}: {}", id, e.getMessage());
-            return ResponseEntity.status(500).body(java.util.Map.of("message", e.getMessage()));
+            return ResponseEntity.status(500).body(java.util.Map.of("message", "Logo upload failed"));
         }
     }
 
@@ -434,9 +420,15 @@ public class AdminController {
     @Operation(summary = "Download the company logo")
     public ResponseEntity<byte[]> getLogo(@PathVariable Long id) {
         return adminService.getCompanyLogo(id)
-                .map((com.courierapp.dto.admin.LogoDto logo) -> ResponseEntity.ok()
-                        .contentType(MediaType.parseMediaType(logo.contentType() != null ? logo.contentType() : "image/png"))
-                        .body(logo.data()))
+                .map((com.courierapp.dto.admin.LogoDto logo) -> {
+                    // Re-detect content type from magic bytes — never trust the stored client value
+                    String safeType = detectImageContentType(logo.data());
+                    MediaType mediaType = MediaType.parseMediaType(safeType != null ? safeType : "image/png");
+                    return ResponseEntity.ok()
+                            .contentType(mediaType)
+                            .header("X-Content-Type-Options", "nosniff")
+                            .body(logo.data());
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -525,5 +517,20 @@ public class AdminController {
             @PathVariable Long companyId,
             @RequestBody List<com.courierapp.dto.admin.StickerFieldDto> fields) {
         return adminService.saveStickerFieldConfig(companyId, fields);
+    }
+
+    /** Detect image type from magic bytes — ignores client-supplied Content-Type. */
+    private String detectImageContentType(byte[] bytes) {
+        if (bytes == null || bytes.length < 4) return null;
+        // PNG: 89 50 4E 47
+        if (bytes[0] == (byte) 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47) return "image/png";
+        // JPEG: FF D8 FF
+        if (bytes[0] == (byte) 0xFF && bytes[1] == (byte) 0xD8 && bytes[2] == (byte) 0xFF) return "image/jpeg";
+        // GIF: 47 49 46 38
+        if (bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x38) return "image/gif";
+        // WebP: 52 49 46 46 ... 57 45 42 50
+        if (bytes.length >= 12 && bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46
+                && bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50) return "image/webp";
+        return null;
     }
 }

@@ -1,6 +1,7 @@
 package com.courierapp.controller;
 
 import com.courierapp.dto.PageResponse;
+import com.courierapp.dto.admin.CompanySettingsResponse;
 import com.courierapp.dto.approval.ApprovalInfoResponse;
 import com.courierapp.dto.booking.ApprovalDecisionRequest;
 import com.courierapp.dto.booking.AwbUpdateRequest;
@@ -11,6 +12,8 @@ import com.courierapp.entity.Booking;
 import com.courierapp.enums.BookingStatus;
 import com.courierapp.enums.CourierMode;
 import com.courierapp.repository.BookingRepository;
+import com.courierapp.repository.UserRepository;
+import com.courierapp.service.AdminService;
 import com.courierapp.service.ApprovalAuthorizationService;
 import com.courierapp.service.BookingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -39,13 +42,19 @@ public class BookingController {
     private final BookingService bookingService;
     private final BookingRepository bookingRepository;
     private final ApprovalAuthorizationService approvalAuthorizationService;
+    private final UserRepository userRepository;
+    private final AdminService adminService;
 
     public BookingController(BookingService bookingService,
                              BookingRepository bookingRepository,
-                             ApprovalAuthorizationService approvalAuthorizationService) {
+                             ApprovalAuthorizationService approvalAuthorizationService,
+                             UserRepository userRepository,
+                             AdminService adminService) {
         this.bookingService = bookingService;
         this.bookingRepository = bookingRepository;
         this.approvalAuthorizationService = approvalAuthorizationService;
+        this.userRepository = userRepository;
+        this.adminService = adminService;
     }
 
     @GetMapping
@@ -179,5 +188,14 @@ public class BookingController {
     @Operation(summary = "Approver rejects cancellation (PENDING_CANCELLATION → APPROVED)")
     public BookingResponse rejectCancellation(@PathVariable Long id, Authentication authentication) {
         return bookingService.rejectCancellation(id, authentication.getName());
+    }
+
+    @GetMapping("/my-company-settings")
+    @Operation(summary = "Get company settings for the authenticated user's company (sender auto-fill)")
+    public ResponseEntity<CompanySettingsResponse> myCompanySettings(Authentication authentication) {
+        return userRepository.findByUsername(authentication.getName())
+                .filter(u -> u.getCompany() != null)
+                .map(u -> ResponseEntity.ok(adminService.getCompanySettingsByCompanyId(u.getCompany().getId())))
+                .orElse(ResponseEntity.noContent().build());
     }
 }

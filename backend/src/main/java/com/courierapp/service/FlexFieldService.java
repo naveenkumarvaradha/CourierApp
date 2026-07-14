@@ -19,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 @Slf4j
 @Service
@@ -67,7 +69,7 @@ public class FlexFieldService {
         FlexField saved = fieldRepo.save(field);
         log.info("Flex field created id={}", saved.getId());
         auditLogService.log("FLEX_FIELD", "CREATE", saved.getId(),
-                saved.getModule() + "." + saved.getFieldName(), "admin",
+                saved.getModule() + "." + saved.getFieldName(), currentUsername(),
                 "type=" + saved.getFieldType());
         return toFieldResponse(saved);
     }
@@ -83,7 +85,7 @@ public class FlexFieldService {
         applyField(field, req);
         FlexField saved = fieldRepo.save(field);
         auditLogService.log("FLEX_FIELD", "UPDATE", saved.getId(),
-                saved.getModule() + "." + saved.getFieldName(), "admin", null);
+                saved.getModule() + "." + saved.getFieldName(), currentUsername(), null);
         return toFieldResponse(saved);
     }
 
@@ -92,7 +94,7 @@ public class FlexFieldService {
         FlexField f = findField(id);
         String name = f.getModule() + "." + f.getFieldName();
         fieldRepo.delete(f);
-        auditLogService.log("FLEX_FIELD", "DELETE", id, name, "admin", null);
+        auditLogService.log("FLEX_FIELD", "DELETE", id, name, currentUsername(), null);
     }
 
     private void applyField(FlexField field, FlexFieldDefinitionRequest req) {
@@ -161,6 +163,11 @@ public class FlexFieldService {
     }
 
     // ── Helpers ──────────────────────────────────────────────────
+
+    private String currentUsername() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return (auth != null && auth.isAuthenticated()) ? auth.getName() : "system";
+    }
 
     private FlexField findField(Long id) {
         return fieldRepo.findById(id).orElseThrow(() -> new ResourceNotFoundException("Flex field", id));

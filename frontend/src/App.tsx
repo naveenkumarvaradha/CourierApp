@@ -21,9 +21,6 @@ import SystemStatusPage from './pages/admin/SystemStatusPage';
 import ApprovalCenterPage from './pages/ApprovalCenterPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
-import MfaConfirmPage from './pages/auth/MfaConfirmPage';
-import MfaSetupPage from './pages/auth/MfaSetupPage';
-import MfaAdminPage from './pages/admin/MfaAdminPage';
 import PartiesPage from './pages/master/PartiesPage';
 import BookingsPage from './pages/booking/BookingsPage';
 import BookingFormPage from './pages/booking/BookingFormPage';
@@ -56,7 +53,6 @@ export default function App() {
     return (
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/mfa-confirm" element={<MfaConfirmPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
@@ -229,15 +225,6 @@ export default function App() {
           }
         />
 
-        <Route path="profile/mfa" element={<MfaSetupPage />} />
-        <Route
-          path="admin/mfa-management"
-          element={
-            <RequirePermission codes={['ADMIN_VIEW']}>
-              <MfaAdminPage />
-            </RequirePermission>
-          }
-        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

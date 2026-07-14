@@ -240,8 +240,9 @@ public class SystemStatusController {
             @PathVariable Long userId,
             @AuthenticationPrincipal UserDetails principal) {
         boolean removed = sessionTrackingService.terminateSession(userId);
+        String adminUsername = principal != null ? principal.getUsername() : "unknown";
         auditLogService.log("AUTH", "SESSION_TERMINATED_BY_ADMIN", userId,
-                String.valueOf(userId), principal.getUsername(), "Force session termination");
+                String.valueOf(userId), adminUsername, "Force session termination");
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("userId", userId);
         response.put("terminated", removed);

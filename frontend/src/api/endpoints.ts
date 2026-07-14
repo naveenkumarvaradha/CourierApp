@@ -1,5 +1,4 @@
 import { api, BASE_URL, tokenStore } from './client';
-import type { MfaSetupResponse } from '../types';
 import type {
   ApprovalInfo,
   ApprovalRouting,
@@ -54,14 +53,6 @@ export const authApi = {
     api.post<{ message: string }>('/auth/reset-password', { token, newPassword }).then((r) => r.data),
   logout: () =>
     api.post<{ message: string }>('/auth/logout').then((r) => r.data),
-  setupMfa: () =>
-    api.post<MfaSetupResponse>('/auth/setup-mfa').then((r) => r.data),
-  enableMfa: (code: string) =>
-    api.post<{ message: string }>('/auth/enable-mfa', { code }).then((r) => r.data),
-  disableMfa: () =>
-    api.post<{ message: string }>('/auth/disable-mfa').then((r) => r.data),
-  confirmMfa: (mfaPendingToken: string, code: string) =>
-    api.post<import('../types').TokenResponse>('/auth/confirm-mfa', { mfaPendingToken, code }).then((r) => r.data),
 };
 
 // ---------- Admin ----------
@@ -207,6 +198,8 @@ export const partyApi = {
 
 // ---------- Bookings ----------
 export const bookingApi = {
+  myCompanySettings: () =>
+    api.get<CompanySettings>('/bookings/my-company-settings').then((r) => r.data),
   search: (params: Record<string, string | number | boolean | undefined | null>) =>
     api.get<PageResponse<Booking>>('/bookings', { params }).then((r) => r.data),
   get: (id: number) => api.get<Booking>(`/bookings/${id}`).then((r) => r.data),
