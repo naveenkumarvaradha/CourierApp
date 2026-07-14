@@ -10,6 +10,14 @@ spring:
         locator:
           enabled: true
           lower-case-service-id: true
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns: ${CORS_ORIGINS:http://localhost:5173}
+            allowedMethods: GET,POST,PUT,PATCH,DELETE,OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
       routes:
         # Auth Service routes — public + protected auth endpoints
         - id: auth-service
@@ -73,13 +81,15 @@ spring:
 eureka:
   client:
     service-url:
-      defaultZone: http://${EUREKA_USERNAME:admin}:${EUREKA_PASSWORD:admin123}@${EUREKA_HOST:localhost}:8761/eureka/
+      defaultZone: http://${EUREKA_USERNAME:admin}:${EUREKA_PASSWORD}@${EUREKA_HOST:localhost}:8761/eureka/
   instance:
     prefer-ip-address: true
 
 app:
   jwt:
-    secret: ${APP_JWT_SECRET:change-me-to-a-secure-256bit-key-in-production-must-be-very-long}
+    secret: ${APP_JWT_SECRET}
+  internal:
+    secret: ${APP_INTERNAL_SECRET}
 
 management:
   endpoints:

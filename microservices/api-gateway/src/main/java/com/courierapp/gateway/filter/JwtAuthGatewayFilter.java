@@ -31,6 +31,9 @@ public class JwtAuthGatewayFilter implements GlobalFilter, Ordered {
     @Value("${app.jwt.secret}")
     private String jwtSecret;
 
+    @Value("${app.internal.secret}")
+    private String internalSecret;
+
     private SecretKey signingKey;
 
     /**
@@ -48,6 +51,15 @@ public class JwtAuthGatewayFilter implements GlobalFilter, Ordered {
         "/api/auth/reset-password/validate"
     );
 
+    /**
+     * Identity/internal headers that must only ever be set by this gateway. Any of these
+     * arriving from a client are stripped before routing so a caller cannot smuggle a
+     * spoofed identity past the JWT check and have it trusted by a downstream service.
+     */
+    private static final Set<String> INTERNAL_HEADERS = Set.of(
+        "X-User-Id", "X-Username", "X-Company-Id", "X-Roles", "X-Internal-Auth", "X-Internal-Service"
+    );
+
     @PostConstruct
     public void init() {
         byte[] keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
@@ -63,6 +75,14 @@ public class JwtAuthGatewayFilter implements GlobalFilter, Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getPath().value();
+
+        // Strip any client-supplied identity/internal headers on every request, regardless of
+        // path, so a caller can never smuggle a spoofed identity or internal-auth secret past
+        // this gateway and have it trusted by a downstream service.
+        ServerHttpRequest strippedRequest = exchange.getRequest().mutate()
+            .headers(headers -> INTERNAL_HEADERS.forEach(headers::remove))
+            .build();
+        exchange = exchange.mutate().request(strippedRequest).build();
 
         // Actuator endpoints — always allow without authentication
         if (path.contains("/actuator")) {
@@ -94,12 +114,17 @@ public class JwtAuthGatewayFilter implements GlobalFilter, Ordered {
                 return unauthorize(exchange, "MFA verification required");
             }
 
-            // Propagate user context to downstream services via headers
+            // Propagate user context to downstream services via headers, signed with a
+            // shared secret so services can verify the headers actually came from this
+            // gateway and not from a caller with direct network access to their port.
             ServerHttpRequest enriched = exchange.getRequest().mutate()
-                .header("X-User-Id",    claims.get("uid")   != null ? claims.get("uid").toString()   : "")
-                .header("X-Username",   claims.getSubject() != null ? claims.getSubject()             : "")
-                .header("X-Company-Id", claims.get("cid")   != null ? claims.get("cid").toString()   : "")
-                .header("X-Roles",      claims.get("roles") != null ? claims.get("roles").toString()  : "")
+                .headers(headers -> {
+                    headers.set("X-User-Id",      claims.get("uid")   != null ? claims.get("uid").toString()  : "");
+                    headers.set("X-Username",     claims.getSubject() != null ? claims.getSubject()            : "");
+                    headers.set("X-Company-Id",   claims.get("cid")   != null ? claims.get("cid").toString()  : "");
+                    headers.set("X-Roles",        claims.get("roles") != null ? claims.get("roles").toString() : "");
+                    headers.set("X-Internal-Auth", internalSecret);
+                })
                 .build();
 
             return chain.filter(exchange.mutate().request(enriched).build());

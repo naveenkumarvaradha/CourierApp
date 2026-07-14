@@ -7,7 +7,7 @@ spring:
   security:
     user:
       name: ${EUREKA_USERNAME:admin}
-      password: ${EUREKA_PASSWORD:admin123}
+      password: ${EUREKA_PASSWORD}
 
 eureka:
   instance:
@@ -16,11 +16,11 @@ eureka:
     register-with-eureka: false
     fetch-registry: false
     service-url:
-      defaultZone: http://${EUREKA_USERNAME:admin}:${EUREKA_PASSWORD:admin123}@localhost:8761/eureka/
+      defaultZone: http://${EUREKA_USERNAME:admin}:${EUREKA_PASSWORD}@localhost:8761/eureka/
 
 eureka.security:
   username: ${EUREKA_USERNAME:admin}
-  password: ${EUREKA_PASSWORD:admin123}
+  password: ${EUREKA_PASSWORD}
 
 management:
   endpoints:

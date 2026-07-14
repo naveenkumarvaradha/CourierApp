@@ -77,7 +77,11 @@
       "mcp__claude-in-chrome__file_upload",
       "Bash(cp \"C:/Users/naveenkumarv/Videos/Naveenkumar_V-ERP_Implementation_Specialist .pdf\" \"/c/Users/naveenkumarv/AppData/Local/Temp/claude/D--Application-CourierApp/1defe136-28f8-4033-b1ce-028e8051b628/scratchpad/Naveenkumar_V-ERP_Implementation_Specialist.pdf\" 2>&1 || echo \"FAILED\")",
       "Bash(ls -la \"/c/Users/naveenkumarv/AppData/Local/Temp/claude/D--Application-CourierApp/1defe136-28f8-4033-b1ce-028e8051b628/scratchpad/\" 2>&1)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(grep -v \"PASSWORD:\\\\|SECRET:\\\\|\\\\${\")",
+      "Bash(git fetch *)",
+      "Bash(xargs cat)",
+      "Bash(git check-ignore *)"
     ]
   }
 }

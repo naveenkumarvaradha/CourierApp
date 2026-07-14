@@ -14,6 +14,12 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableMethodSecurity
 public class HeaderSecurityConfig {
 
+    private final HeaderAuthenticationFilter headerAuthenticationFilter;
+
+    public HeaderSecurityConfig(HeaderAuthenticationFilter headerAuthenticationFilter) {
+        this.headerAuthenticationFilter = headerAuthenticationFilter;
+    }
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
@@ -23,7 +29,7 @@ public class HeaderSecurityConfig {
                 .requestMatchers("/actuator/**").permitAll()
                 .anyRequest().authenticated()
             )
-            .addFilterBefore(new HeaderAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(headerAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 }
