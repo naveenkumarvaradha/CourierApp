@@ -90,7 +90,18 @@
       "Bash(mv frontend/nginx.conf frontend/nginx.conf.template)",
       "Bash(nginx -v)",
       "PowerShell(Get-Process -Name navee_os)",
-      "Bash(rm -f \"C:/Users/NAVEEN~1.TRO/AppData/Local/Temp/navee_os_window.png\" \"C:/Users/NAVEEN~1.TRO/AppData/Local/Temp/navee_os_screenshot.png\"; echo cleaned)"
+      "Bash(rm -f \"C:/Users/NAVEEN~1.TRO/AppData/Local/Temp/navee_os_window.png\" \"C:/Users/NAVEEN~1.TRO/AppData/Local/Temp/navee_os_screenshot.png\"; echo cleaned)",
+      "Bash(mvn -q -pl api-gateway -am compile)",
+      "Bash(xargs grep -l \"Authorization\\\\|fetchBaseQuery\\\\|baseUrl\")",
+      "Bash(mvn -q -pl api-gateway,auth-service,booking-service,party-service,admin-service,report-service,eureka-server -am compile)",
+      "Bash(node -e ' *)",
+      "Bash(python3 -c \"import yaml\")",
+      "Bash(py -3 -c \"import yaml; yaml.safe_load\\(open\\('docker-compose.yml'\\)\\); yaml.safe_load\\(open\\('docker-compose-microservices.yml'\\)\\); print\\('BOTH VALID YAML'\\)\")",
+      "Bash(npx --yes js-yaml docker-compose.yml)",
+      "Bash(npx --yes js-yaml docker-compose-microservices.yml)",
+      "Bash(grep -n '\\\\$' frontend/nginx.conf.template)",
+      "Bash(git rev-list *)",
+      "Bash(grep -E \"\\\\.env$|certs/\")"
     ]
   }
 }
