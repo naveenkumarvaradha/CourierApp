@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import BusinessIcon from '@mui/icons-material/Business';
 import { adminApi, approvalApi, bookingApi, flexFieldApi, partyApi } from '../../api/endpoints';
+import { useCreateBookingMutation, useUpdateBookingMutation } from '../../store/api/bookingApiSlice';
 import { extractErrorMessage } from '../../api/client';
 import { useNotification } from '../../context/NotificationContext';
 import FlexFieldsSection from '../../components/FlexFieldsSection';
@@ -88,6 +89,9 @@ export default function BookingFormPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ defaultValues: DEFAULTS });
 
+  const [createBooking] = useCreateBookingMutation();
+  const [updateBooking] = useUpdateBookingMutation();
+
   useEffect(() => {
     // Exclude company-linked parties (partyCode starts with "COMPANY") from receiver dropdown
     partyApi.listActive()
@@ -139,11 +143,11 @@ export default function BookingFormPage() {
     try {
       let savedId: number;
       if (isEdit) {
-        await bookingApi.update(Number(id), body);
+        await updateBooking({ id: Number(id), data: body }).unwrap();
         savedId = Number(id);
         notify('Booking updated', 'success');
       } else {
-        const created = await bookingApi.create(body);
+        const created = await createBooking(body).unwrap();
         savedId = created.id;
         notify('Booking created', 'success');
       }
@@ -274,7 +278,9 @@ export default function BookingFormPage() {
                     <TextField {...field} select label="Receiver *" fullWidth
                       error={!!errors.receiverId} helperText={errors.receiverId?.message}>
                       {parties.map((p) => (
-                        <MenuItem key={p.id} value={p.id}>{p.partyName} ({p.partyCode})</MenuItem>
+                        <MenuItem key={p.id} value={p.id}>
+                          {p.partyName}{p.companyName ? ` — ${p.companyName}` : ''} ({p.partyCode})
+                        </MenuItem>
                       ))}
                     </TextField>
                   )} />

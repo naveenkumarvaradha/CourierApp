@@ -159,6 +159,9 @@ management:
     health:
       show-details: when-authorized
       show-components: when-authorized
+  health:
+    mail:
+      enabled: false
   info:
     env:
       enabled: true

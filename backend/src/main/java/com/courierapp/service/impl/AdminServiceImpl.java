@@ -668,7 +668,7 @@ public class AdminServiceImpl implements AdminService {
     @Cacheable(CACHE_COURIER_WAYS)
     public List<CourierWayResponse> listCourierWays() {
         return courierWayRepository.findAll().stream()
-                .map(this::toCourierWayResponse).toList();
+                .map(this::toCourierWayResponse).collect(Collectors.toList());
     }
 
     @Override
@@ -676,7 +676,7 @@ public class AdminServiceImpl implements AdminService {
     @Cacheable(value = CACHE_COURIER_WAYS, key = "'active'")
     public List<CourierWayResponse> listActiveCourierWays() {
         return courierWayRepository.findByActiveTrueOrderByNameAsc().stream()
-                .map(this::toCourierWayResponse).toList();
+                .map(this::toCourierWayResponse).collect(Collectors.toList());
     }
 
     @Override
@@ -735,7 +735,7 @@ public class AdminServiceImpl implements AdminService {
     @Cacheable(CACHE_PACKAGE_TYPES)
     public List<PackageTypeResponse> listPackageTypes() {
         return packageTypeRepository.findAll().stream()
-                .map(this::toPackageTypeResponse).toList();
+                .map(this::toPackageTypeResponse).collect(Collectors.toList());
     }
 
     @Override
@@ -743,7 +743,7 @@ public class AdminServiceImpl implements AdminService {
     @Cacheable(value = CACHE_PACKAGE_TYPES, key = "'active'")
     public List<PackageTypeResponse> listActivePackageTypes() {
         return packageTypeRepository.findByActiveTrueOrderByNameAsc().stream()
-                .map(this::toPackageTypeResponse).toList();
+                .map(this::toPackageTypeResponse).collect(Collectors.toList());
     }
 
     @Override
@@ -801,14 +801,14 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(readOnly = true)
     @Cacheable(CACHE_DEPARTMENTS)
     public List<DepartmentResponse> listDepartments() {
-        return departmentRepository.findAll().stream().map(this::toDeptResponse).toList();
+        return departmentRepository.findAll().stream().map(this::toDeptResponse).collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     @Cacheable(value = CACHE_DEPARTMENTS, key = "'active'")
     public List<DepartmentResponse> listActiveDepartments() {
-        return departmentRepository.findByActiveTrueOrderByNameAsc().stream().map(this::toDeptResponse).toList();
+        return departmentRepository.findByActiveTrueOrderByNameAsc().stream().map(this::toDeptResponse).collect(Collectors.toList());
     }
 
     @Override
