@@ -149,6 +149,7 @@ export default function LoginPage() {
                 disabled={companies.length === 0}
                 size="small"
                 sx={fieldSx}
+                SelectProps={{ MenuProps: { transitionDuration: 0 } }}
               >
                 {companies.map((c) => (
                   <MenuItem key={c.id} value={c.companyCode}>{c.name}</MenuItem>
