@@ -59,6 +59,9 @@ services:
       SERVER_PORT: 8080
       # JWT secret (override with a secure value in production)
       APP_JWT_SECRET: ${APP_JWT_SECRET:-change-me-to-a-secure-256bit-key-in-production}
+      # CORS — the frontend container's published host port
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8090}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8090}
       # Mail (set these in .env file for real email)
       SPRING_MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
       SPRING_MAIL_PORT: ${MAIL_PORT:-587}
@@ -70,7 +73,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -88,7 +91,7 @@ services:
     container_name: shipdesk-frontend
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "8090:80"
     depends_on:
       backend:
         condition: service_healthy
