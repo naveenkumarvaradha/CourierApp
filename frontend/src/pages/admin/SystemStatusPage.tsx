@@ -337,12 +337,12 @@ export default function SystemStatusPage() {
                   </Box>
                   <Typography variant="h4" fontWeight={800} sx={{ mb: 0.25 }}>{info.jvmTotalUsedMb ?? info.heapUsedMb} MB</Typography>
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                    of {info.jvmTotalCommittedMb ?? info.heapCommittedMb} MB committed
-                  </Typography>
-                  <Typography variant="caption" sx={{ display: 'block', mb: 1, color: 'text.disabled', fontSize: '0.68rem' }}>
                     Heap {info.heapUsedMb} MB · Non-Heap {info.nonHeapUsedMb} MB
                   </Typography>
-                  <GaugeBar value={info.jvmMemUsedPercent ?? info.heapUsedPercent} />
+                  <Typography variant="caption" sx={{ display: 'block', mb: 1, color: 'text.disabled', fontSize: '0.68rem' }}>
+                    {info.heapUsedPercent}% of {info.heapMaxMb} MB heap max
+                  </Typography>
+                  <GaugeBar value={info.heapUsedPercent} />
                 </Paper>
               </Grid>
             )}

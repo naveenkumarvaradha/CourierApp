@@ -1,0 +1,9 @@
+#! redis-redisdata-persistentVolumeClaim.yaml
+# Generated code, do not edit
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+    name: redis-redisdata
+    namespace: courierapp
+spec:
+    storageClassName: "hostpath" # see docker/desktop-storage-provisioner
