@@ -4,6 +4,7 @@
   <description>Persistent kubectl port-forward exposing the courierapp backend service on localhost:18080</description>
   <executable>C:\Program Files\Docker\Docker\resources\bin\kubectl.exe</executable>
   <arguments>port-forward -n courierapp svc/backend-published 18080:8080 --address=0.0.0.0</arguments>
+  <env name="KUBECONFIG" value="C:\Users\naveenkumarv.TROPICKNITS\.kube\config"/>
   <startmode>Automatic</startmode>
   <logpath>D:\Application\CourierApp\k8s-portforward\logs</logpath>
   <log mode="roll-by-size">

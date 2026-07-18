@@ -26,7 +26,7 @@ spec:
             restartPolicy: Always
             containers:
                 - name: shipdesk-frontend
-                  image: courierapp-frontend:v3
+                  image: courierapp-frontend:v4
                   imagePullPolicy: IfNotPresent
                   ports:
                     - name: frontend-80
