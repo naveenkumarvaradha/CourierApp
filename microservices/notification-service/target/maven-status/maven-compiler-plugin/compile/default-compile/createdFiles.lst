@@ -1,6 +1,0 @@
-com\courierapp\notification\event\BookingEventConsumer.class
-com\courierapp\notification\event\AuthEventConsumer.class
-com\courierapp\notification\service\EmailService.class
-com\courierapp\notification\NotificationServiceApplication.class
-com\courierapp\notification\config\KafkaConsumerConfig.class
-com\courierapp\notification\service\impl\EmailServiceImpl.class
