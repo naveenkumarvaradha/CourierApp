@@ -14,6 +14,8 @@ public record BookingRequest(
 
         Long packageTypeId,
 
+        Long unitId,
+
         @NotBlank(message = "Item description is required")
         @Size(max = 500)
         String itemDescription,

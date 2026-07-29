@@ -29,6 +29,7 @@ import SendIcon from '@mui/icons-material/Send';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import CancelIcon from '@mui/icons-material/Cancel';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import { bookingApi } from '../../api/endpoints';
 import { extractErrorMessage, extractBlobError } from '../../api/client';
 import {
@@ -279,6 +280,13 @@ export default function BookingsPage() {
               <Tooltip title={b.printTaken ? 'Reprint sticker' : 'Print sticker'}>
                 <IconButton size="small" color={b.printTaken ? 'default' : 'primary'} onClick={() => printSticker(b)}>
                   <PrintIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            {hasPermission('DELIVERY_CHALLAN_CREATE') && canPrint && (
+              <Tooltip title="Create delivery challan">
+                <IconButton size="small" onClick={() => navigate(`/dc/new?bookingId=${b.id}`)}>
+                  <ReceiptLongIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
             )}

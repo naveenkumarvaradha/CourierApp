@@ -207,6 +207,22 @@ export interface PackageType {
   active: boolean;
 }
 
+export interface Unit {
+  id: number;
+  unitName: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  pincode: string;
+  country: string;
+  phone: string | null;
+  email: string | null;
+  gstin: string | null;
+  defaultUnit: boolean;
+  active: boolean;
+}
+
 export type FlexFieldType = 'TEXT' | 'DROPDOWN_SINGLE' | 'DROPDOWN_MULTI';
 
 export interface FlexFieldOption {
@@ -251,6 +267,7 @@ export interface Booking {
   receiver: Party;
   courierWay: CourierWay | null;
   packageType: PackageType | null;
+  unit: Unit | null;
   itemDescription: string;
   weightKg: number;
   noOfPackages: number;
@@ -268,6 +285,24 @@ export interface Booking {
   createdAt: string | null;
   createdBy: string | null;
   pendingApprovers?: string[] | null;
+}
+
+export type DcStatus = 'DRAFT' | 'ISSUED' | 'DELIVERED';
+
+export interface DeliveryChallan {
+  id: number;
+  dcNumber: string;
+  dcDate: string;
+  booking: Booking;
+  unit: Unit;
+  vehicleNumber: string | null;
+  driverName: string | null;
+  status: DcStatus;
+  remarks: string | null;
+  createdAt: string | null;
+  createdBy: string | null;
+  updatedAt: string | null;
+  updatedBy: string | null;
 }
 
 export interface PartyBreakdown {

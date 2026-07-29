@@ -23,6 +23,8 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import LogoutIcon from '@mui/icons-material/Logout';
 import LockIcon from '@mui/icons-material/Lock';
 import ApartmentIcon from '@mui/icons-material/Apartment';
+import StoreIcon from '@mui/icons-material/Store';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import StickyNote2Icon from '@mui/icons-material/StickyNote2';
 import EmailIcon from '@mui/icons-material/Email';
 import MonitorHeartIcon from '@mui/icons-material/MonitorHeart';
@@ -51,6 +53,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Departments',      to: '/admin/departments',         icon: <DomainIcon />,         permissions: ['ADMIN_VIEW'],   group: 'Admin' },
   { label: 'Courier Ways',     to: '/admin/courier-ways',        icon: <AltRouteIcon />,       permissions: ['ADMIN_VIEW'],   group: 'Admin' },
   { label: 'Package Types',    to: '/admin/package-types',       icon: <InventoryIcon />,      permissions: ['ADMIN_VIEW'],   group: 'Admin' },
+  { label: 'Units',            to: '/admin/units',               icon: <StoreIcon />,          permissions: ['ADMIN_VIEW'],   group: 'Admin' },
   { label: 'Flex Fields',      to: '/admin/flex-fields',         icon: <TuneIcon />,           permissions: ['ADMIN_VIEW'],   group: 'Admin' },
   { label: 'Audit Logs',       to: '/admin/audit-logs',          icon: <HistoryIcon />,        permissions: ['ADMIN_VIEW'],   group: 'Admin' },
   { label: 'Companies',        to: '/admin/companies',           icon: <ApartmentIcon />,      permissions: ['ADMIN_VIEW'],   group: 'Admin' },
@@ -61,6 +64,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'System Status',    to: '/admin/system-status',       icon: <MonitorHeartIcon />,   permissions: ['ADMIN_VIEW'],   group: 'Admin' },
   { label: 'Parties',          to: '/master/parties',            icon: <ContactsIcon />,       permissions: ['MASTER_VIEW'],  group: 'Master' },
   { label: 'Bookings',         to: '/bookings',                  icon: <LocalShippingIcon />,  permissions: ['BOOKING_VIEW'], group: 'Booking' },
+  { label: 'Delivery Challans', to: '/dc',                       icon: <ReceiptLongIcon />,    permissions: ['DELIVERY_CHALLAN_VIEW'], group: 'Booking' },
   { label: 'Reports',          to: '/reports',                   icon: <AssessmentIcon />,     permissions: ['REPORTS_VIEW'], group: 'Reports' },
 ];
 

@@ -4,6 +4,7 @@ import com.courierapp.dto.admin.StickerFieldDto;
 import com.courierapp.entity.Booking;
 import com.courierapp.entity.CompanySettings;
 import com.courierapp.entity.Party;
+import com.courierapp.entity.Unit;
 import com.courierapp.entity.User;
 import com.lowagie.text.Chunk;
 import com.lowagie.text.Document;
@@ -73,7 +74,7 @@ public class StickerPdfService {
      *  └──────────────────────────────────────────────┘
      */
     public byte[] generate(Booking booking, User creator, CompanySettings company,
-                           List<StickerFieldDto> fields) {
+                           Unit unit, List<StickerFieldDto> fields) {
         Set<String> visible = (fields == null || fields.isEmpty())
                 ? null
                 : fields.stream().filter(StickerFieldDto::visible)
@@ -188,7 +189,9 @@ public class StickerPdfService {
             if (show(visible, "FROM_PHONE")) {
                 String phone = (creator != null && creator.getPhone() != null && !creator.getPhone().isBlank())
                         ? creator.getPhone()
-                        : (company != null && company.getPhone() != null ? company.getPhone() : null);
+                        : (unit != null && unit.getPhone() != null && !unit.getPhone().isBlank())
+                                ? unit.getPhone()
+                                : (company != null && company.getPhone() != null ? company.getPhone() : null);
                 if (phone != null && !phone.isBlank()) {
                     fromPara.add(new Chunk("Mob: " + phone + "\n", F_FROM_PH));
                 }
@@ -196,7 +199,14 @@ public class StickerPdfService {
             if (show(visible, "SENDER_COMPANY") && company != null && company.getCompanyName() != null) {
                 fromPara.add(new Chunk(company.getCompanyName() + "\n", F_FROM_CO));
             }
-            if (show(visible, "FROM_ADDRESS") && company != null && company.getAddressLine1() != null) {
+            if (show(visible, "FROM_ADDRESS") && unit != null && unit.getAddressLine1() != null) {
+                fromPara.add(new Chunk(unit.getAddressLine1(), F_FROM_B));
+                if (unit.getAddressLine2() != null && !unit.getAddressLine2().isBlank()) {
+                    fromPara.add(new Chunk(", " + unit.getAddressLine2(), F_FROM_B));
+                }
+                fromPara.add(new Chunk("\n" + unit.getCity() + " - " + unit.getPincode()
+                        + ", " + unit.getState(), F_FROM_B));
+            } else if (show(visible, "FROM_ADDRESS") && unit == null && company != null && company.getAddressLine1() != null) {
                 fromPara.add(new Chunk(company.getAddressLine1(), F_FROM_B));
                 if (company.getAddressLine2() != null && !company.getAddressLine2().isBlank()) {
                     fromPara.add(new Chunk(", " + company.getAddressLine2(), F_FROM_B));
@@ -266,9 +276,9 @@ public class StickerPdfService {
         }
     }
 
-    /** Backward-compat: no field config → show all fields */
+    /** Backward-compat: no unit/field config → show all fields, company address */
     public byte[] generate(Booking booking, User creator, CompanySettings company) {
-        return generate(booking, creator, company, null);
+        return generate(booking, creator, company, null, null);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

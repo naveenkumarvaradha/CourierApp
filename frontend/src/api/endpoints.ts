@@ -23,8 +23,24 @@ import type {
   Role,
   StickerField,
   TokenResponse,
+  Unit,
   UserAccount,
 } from '../types';
+
+interface UnitRequestBody {
+  unitName: string;
+  addressLine1: string;
+  addressLine2?: string | null;
+  city: string;
+  state: string;
+  pincode: string;
+  country: string;
+  phone?: string | null;
+  email?: string | null;
+  gstin?: string | null;
+  defaultUnit: boolean;
+  active: boolean;
+}
 
 // ---------- Dashboard ----------
 export const dashboardApi = {
@@ -103,6 +119,13 @@ export const adminApi = {
   updatePackageType: (id: number, body: { name: string; active: boolean }) =>
     api.put<PackageType>(`/admin/package-types/${id}`, body).then((r) => r.data),
   deletePackageType: (id: number) => api.delete(`/admin/package-types/${id}`),
+
+  listUnits: () => api.get<Unit[]>('/admin/units').then((r) => r.data),
+  listActiveUnits: () => api.get<Unit[]>('/admin/units/active').then((r) => r.data),
+  createUnit: (body: UnitRequestBody) => api.post<Unit>('/admin/units', body).then((r) => r.data),
+  updateUnit: (id: number, body: UnitRequestBody) =>
+    api.put<Unit>(`/admin/units/${id}`, body).then((r) => r.data),
+  deleteUnit: (id: number) => api.delete(`/admin/units/${id}`),
 
   listDepartments: () => api.get<Department[]>('/admin/departments').then((r) => r.data),
   listActiveDepartments: () => api.get<Department[]>('/admin/departments/active').then((r) => r.data),
@@ -226,6 +249,13 @@ export const bookingApi = {
     api.post<Booking>(`/bookings/${id}/approve-cancellation`).then((r) => r.data),
   rejectCancellation: (id: number) =>
     api.post<Booking>(`/bookings/${id}/reject-cancellation`).then((r) => r.data),
+};
+
+// ---------- Delivery Challans ----------
+export const dcApi = {
+  printUrl: (id: number) => `${BASE_URL}/dc/${id}/print`,
+  fetchPrint: (id: number) =>
+    api.get(`/dc/${id}/print`, { responseType: 'blob' }).then((r) => r.data as Blob),
 };
 
 // ---------- Reports ----------

@@ -28,7 +28,7 @@
   </parent>
 
   <properties>
-    <java.version>17</java.version>
+    <java.version>25</java.version>
     <spring-cloud.version>2023.0.3</spring-cloud.version>
     <lombok.version>1.18.46</lombok.version>
   </properties>

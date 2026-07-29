@@ -9,6 +9,9 @@ import RolesPage from './pages/admin/RolesPage';
 import ApprovalRoutingPage from './pages/admin/ApprovalRoutingPage';
 import CourierWaysPage from './pages/admin/CourierWaysPage';
 import PackageTypesPage from './pages/admin/PackageTypesPage';
+import UnitsPage from './pages/admin/UnitsPage';
+import DcListPage from './pages/dc/DcListPage';
+import DcFormPage from './pages/dc/DcFormPage';
 import FlexFieldsPage from './pages/admin/FlexFieldsPage';
 import DepartmentsPage from './pages/admin/DepartmentsPage';
 import AuditLogsPage from './pages/admin/AuditLogsPage';
@@ -105,6 +108,14 @@ export default function App() {
           element={
             <RequirePermission codes={['ADMIN_VIEW']}>
               <PackageTypesPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="admin/units"
+          element={
+            <RequirePermission codes={['ADMIN_VIEW']}>
+              <UnitsPage />
             </RequirePermission>
           }
         />
@@ -212,6 +223,31 @@ export default function App() {
           element={
             <RequirePermission codes={['BOOKING_UPDATE']}>
               <BookingFormPage />
+            </RequirePermission>
+          }
+        />
+
+        <Route
+          path="dc"
+          element={
+            <RequirePermission codes={['DELIVERY_CHALLAN_VIEW']}>
+              <DcListPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="dc/new"
+          element={
+            <RequirePermission codes={['DELIVERY_CHALLAN_CREATE']}>
+              <DcFormPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="dc/:id/edit"
+          element={
+            <RequirePermission codes={['DELIVERY_CHALLAN_UPDATE']}>
+              <DcFormPage />
             </RequirePermission>
           }
         />

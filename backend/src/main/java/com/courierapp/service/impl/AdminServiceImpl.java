@@ -14,6 +14,7 @@ import com.courierapp.entity.Party;
 import com.courierapp.entity.Permission;
 import com.courierapp.entity.Role;
 import com.courierapp.entity.StickerFieldConfig;
+import com.courierapp.entity.Unit;
 import com.courierapp.entity.User;
 import com.courierapp.enums.PartyStatus;
 import com.courierapp.enums.PartyType;
@@ -30,6 +31,7 @@ import com.courierapp.repository.PackageTypeRepository;
 import com.courierapp.repository.PartyRepository;
 import com.courierapp.repository.PermissionRepository;
 import com.courierapp.repository.RoleRepository;
+import com.courierapp.repository.UnitRepository;
 import com.courierapp.repository.UserRepository;
 import com.courierapp.service.AdminService;
 import com.courierapp.service.AuditLogService;
@@ -74,6 +76,7 @@ public class AdminServiceImpl implements AdminService {
     private final AuditLogService auditLogService;
     private final com.courierapp.repository.PasswordPolicyRepository passwordPolicyRepository;
     private final com.courierapp.repository.StickerFieldConfigRepository stickerFieldConfigRepository;
+    private final UnitRepository unitRepository;
 
     public AdminServiceImpl(UserRepository userRepository,
                             RoleRepository roleRepository,
@@ -89,7 +92,8 @@ public class AdminServiceImpl implements AdminService {
                             PermissionMapper permissionMapper,
                             AuditLogService auditLogService,
                             com.courierapp.repository.PasswordPolicyRepository passwordPolicyRepository,
-                            com.courierapp.repository.StickerFieldConfigRepository stickerFieldConfigRepository) {
+                            com.courierapp.repository.StickerFieldConfigRepository stickerFieldConfigRepository,
+                            UnitRepository unitRepository) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.permissionRepository = permissionRepository;
@@ -105,6 +109,7 @@ public class AdminServiceImpl implements AdminService {
         this.auditLogService = auditLogService;
         this.passwordPolicyRepository = passwordPolicyRepository;
         this.stickerFieldConfigRepository = stickerFieldConfigRepository;
+        this.unitRepository = unitRepository;
     }
 
     // ----- Permissions -----
@@ -1026,5 +1031,112 @@ public class AdminServiceImpl implements AdminService {
     private String currentUsername() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return (auth != null && auth.isAuthenticated()) ? auth.getName() : "system";
+    }
+
+    private Long currentCompanyId() {
+        return userRepository.findByUsername(currentUsername())
+                .map(User::getCompany)
+                .map(Company::getId)
+                .orElseThrow(() -> new BusinessException("Current user has no company assigned"));
+    }
+
+    // ----- Units -----
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UnitResponse> listUnits() {
+        return unitRepository.findByCompanyIdOrderByUnitNameAsc(currentCompanyId()).stream()
+                .map(this::toUnitResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UnitResponse> listActiveUnits() {
+        return unitRepository.findByCompanyIdAndActiveTrueOrderByUnitNameAsc(currentCompanyId()).stream()
+                .map(this::toUnitResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    public UnitResponse createUnit(UnitRequest req) {
+        Long companyId = currentCompanyId();
+        log.info("Creating unit: companyId={}, name={}", companyId, req.unitName());
+        if (unitRepository.existsByCompanyIdAndUnitNameIgnoreCase(companyId, req.unitName())) {
+            throw new BusinessException("Unit '" + req.unitName() + "' already exists");
+        }
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Company", companyId));
+        Unit unit = new Unit();
+        unit.setCompany(company);
+        applyUnitFields(unit, req);
+        if (req.defaultUnit()) {
+            clearExistingDefault(companyId);
+        }
+        Unit saved = unitRepository.save(unit);
+        log.info("Unit created: id={}, name={}", saved.getId(), saved.getUnitName());
+        auditLogService.log("UNIT", "CREATE", saved.getId(), saved.getUnitName(), currentUsername(), null);
+        return toUnitResponse(saved);
+    }
+
+    @Override
+    public UnitResponse updateUnit(Long id, UnitRequest req) {
+        Long companyId = currentCompanyId();
+        log.info("Updating unit id={}: name={}", id, req.unitName());
+        Unit unit = unitRepository.findById(id)
+                .filter(u -> u.getCompany() != null && companyId.equals(u.getCompany().getId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Unit", id));
+        if (!unit.getUnitName().equalsIgnoreCase(req.unitName())
+                && unitRepository.existsByCompanyIdAndUnitNameIgnoreCase(companyId, req.unitName())) {
+            throw new BusinessException("Unit '" + req.unitName() + "' already exists");
+        }
+        applyUnitFields(unit, req);
+        if (req.defaultUnit()) {
+            clearExistingDefault(companyId);
+            unit.setDefaultUnit(true);
+        }
+        Unit saved = unitRepository.save(unit);
+        auditLogService.log("UNIT", "UPDATE", saved.getId(), saved.getUnitName(), currentUsername(),
+                "active=" + saved.isActive());
+        return toUnitResponse(saved);
+    }
+
+    @Override
+    public void deleteUnit(Long id) {
+        Long companyId = currentCompanyId();
+        log.info("Deleting unit id={}", id);
+        Unit unit = unitRepository.findById(id)
+                .filter(u -> u.getCompany() != null && companyId.equals(u.getCompany().getId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Unit", id));
+        String name = unit.getUnitName();
+        unitRepository.delete(unit);
+        auditLogService.log("UNIT", "DELETE", id, name, currentUsername(), null);
+    }
+
+    private void applyUnitFields(Unit unit, UnitRequest req) {
+        unit.setUnitName(req.unitName());
+        unit.setAddressLine1(req.addressLine1());
+        unit.setAddressLine2(req.addressLine2());
+        unit.setCity(req.city());
+        unit.setState(req.state());
+        unit.setPincode(req.pincode());
+        unit.setCountry(req.country());
+        unit.setPhone(req.phone());
+        unit.setEmail(req.email());
+        unit.setGstin(req.gstin());
+        unit.setActive(req.active());
+    }
+
+    /** Only one unit per company may be marked default. */
+    private void clearExistingDefault(Long companyId) {
+        unitRepository.findByCompanyIdAndDefaultUnitTrue(companyId)
+                .ifPresent(existing -> {
+                    existing.setDefaultUnit(false);
+                    unitRepository.save(existing);
+                });
+    }
+
+    private UnitResponse toUnitResponse(Unit u) {
+        return new UnitResponse(u.getId(), u.getUnitName(), u.getAddressLine1(), u.getAddressLine2(),
+                u.getCity(), u.getState(), u.getPincode(), u.getCountry(), u.getPhone(), u.getEmail(),
+                u.getGstin(), u.isDefaultUnit(), u.isActive());
     }
 }

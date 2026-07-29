@@ -2,6 +2,7 @@ package com.courierapp.dto.booking;
 
 import com.courierapp.dto.admin.CourierWayResponse;
 import com.courierapp.dto.admin.PackageTypeResponse;
+import com.courierapp.dto.admin.UnitResponse;
 import com.courierapp.dto.master.PartyResponse;
 import com.courierapp.enums.BookingStatus;
 import com.courierapp.enums.CourierMode;
@@ -19,6 +20,7 @@ public record BookingResponse(
         PartyResponse receiver,
         CourierWayResponse courierWay,
         PackageTypeResponse packageType,
+        UnitResponse unit,
         String itemDescription,
         BigDecimal weightKg,
         Integer noOfPackages,

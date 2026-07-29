@@ -9,7 +9,7 @@ Internal courier booking and tracking system for **CTL India Private Limited**.
 ### Backend
 | Layer | Technology | Version |
 |---|---|---|
-| Language | Java | 17 (dev) / 25.0.3 (prod) |
+| Language | Java | 25.0.3 |
 | Framework | Spring Boot | 3.3.4 |
 | Security | Spring Security + JWT (JJWT) | 0.12.6 |
 | Database | PostgreSQL | 18 (prod) |
@@ -143,7 +143,7 @@ POST /api/auth/logout   → token blacklisted in Redis
 ## Local Development
 
 ### Prerequisites
-- JDK 17+
+- JDK 25+
 - Maven 3.8+
 - Node.js 18+
 - PostgreSQL 14+
