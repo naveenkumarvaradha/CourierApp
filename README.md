@@ -10,10 +10,10 @@ Internal courier booking and tracking system for **CTL India Private Limited**.
 | Layer | Technology | Version |
 |---|---|---|
 | Language | Java | 25.0.3 |
-| Framework | Spring Boot | 3.3.4 |
+| Framework | Spring Boot | 3.5.3 |
 | Security | Spring Security + JWT (JJWT) | 0.12.6 |
 | Database | PostgreSQL | 18 (prod) |
-| ORM | Spring Data JPA + Hibernate | via Spring Boot 3.3.4 |
+| ORM | Spring Data JPA + Hibernate | via Spring Boot 3.5.3 |
 | Migrations | Flyway | via Spring Boot |
 | Cache | Redis + Spring Cache (Jedis) | 5.0.14 (prod) |
 | MFA (2FA) | TOTP — Google Authenticator | totp-spring-boot-starter 1.7.1 |
@@ -67,24 +67,27 @@ CourierApp/
 │   │   ├── entity/                     # JPA entities
 │   │   ├── repository/                 # Spring Data JPA
 │   │   ├── dto/                        # Request / Response DTOs
-│   │   │   ├── admin/
+│   │   │   ├── admin/                  # incl. Unit
 │   │   │   ├── auth/
 │   │   │   ├── booking/
+│   │   │   ├── dc/                     # Delivery Challan
+│   │   │   ├── dcreceipt/              # DC Receipt
 │   │   │   └── master/
 │   │   ├── security/                   # JWT filter, AppUserPrincipal
 │   │   ├── kafka/                      # Event producer/consumer (disabled)
 │   │   └── config/                     # Security, Redis, Cache, CORS
 │   └── src/main/resources/
 │       ├── application.yml             # Config (env vars override at runtime)
-│       └── db/migration/               # Flyway SQL migrations V1–V32
+│       └── db/migration/               # Flyway SQL migrations V1–V41
 ├── frontend/                           # React + TypeScript SPA
 │   ├── src/
 │   │   ├── api/                        # Axios client + API endpoints
 │   │   ├── context/                    # AuthContext, NotificationContext
 │   │   ├── pages/                      # Pages by module
-│   │   │   ├── admin/
+│   │   │   ├── admin/                  # incl. Units, Admin hub
 │   │   │   ├── auth/
-│   │   │   ├── booking/
+│   │   │   ├── booking/                # Courier Booking
+│   │   │   ├── dc/                     # DC Booking + DC Receipt
 │   │   │   └── parties/
 │   │   ├── store/                      # Redux + RTK Query slices
 │   │   ├── types/                      # TypeScript interfaces
@@ -106,7 +109,10 @@ CourierApp/
 | **MFA Management** | Admin can force / disable / reset MFA per user |
 | **Bookings** | Create, submit, approve, track courier bookings (multi-level approval) |
 | **Parties** | Sender/receiver address book with approval workflow |
-| **Admin** | Users, roles, permissions, departments, courier ways, package types |
+| **Units** | Company branch/office addresses; selectable as booking sender and DC sender/receiver |
+| **DC Booking** | Standalone Delivery Challan module (own shipment fields, sender = Unit, receiver = Party or Unit), Returnable/Non-Returnable type, multi-level approval, Draft → Pending Approval → Approved → Issued → Delivered |
+| **DC Receipt** | Confirms return of Returnable DCs once Issued/Delivered; moves DC to terminal `Returned` status; single-step confirm with undo |
+| **Admin** | Users, roles, permissions, departments, courier ways, package types, units |
 | **Company Settings** | Address, logo, SMTP config per company |
 | **Reports** | Booking summary, Excel/PDF export, scheduled email reports |
 | **Flex Fields** | Configurable custom fields per module |
@@ -272,6 +278,14 @@ Flyway runs automatically on startup. Files in `backend/src/main/resources/db/mi
 | V30 | Disable all MFA (reset during migration) |
 | V31 | Performance indexes |
 | V32 | Add `mfa_forced` column to users |
+| V34 | Company `units` table + backfill from company settings |
+| V35 | Add `unit_id` to bookings |
+| V36 | Delivery Challan module: `delivery_challans`, `dc_sequence`, permissions |
+| V37 | DC approval workflow columns + `DELIVERY_CHALLAN_APPROVE` + routing seed |
+| V38 | DC redesigned as standalone module (drop booking FK, add shipment fields) |
+| V39 | Add `dc_type` (Returnable / Non-Returnable) |
+| V40 | DC Receipt module: `dc_receipts`, `dc_receipt_sequence`, permissions |
+| V41 | Grant DC/Receipt permissions to `BOOKING_CREATOR` role |
 
 > **Rule:** Never edit existing migration files. Always create `V{n+1}__description.sql`.
 
