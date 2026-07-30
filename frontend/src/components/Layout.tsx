@@ -9,26 +9,14 @@ import {
 import MenuIcon from '@mui/icons-material/Menu';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import DashboardIcon from '@mui/icons-material/Dashboard';
-import PeopleIcon from '@mui/icons-material/People';
-import SecurityIcon from '@mui/icons-material/Security';
-import RuleIcon from '@mui/icons-material/Rule';
-import AltRouteIcon from '@mui/icons-material/AltRoute';
-import InventoryIcon from '@mui/icons-material/Inventory';
-import TuneIcon from '@mui/icons-material/Tune';
-import DomainIcon from '@mui/icons-material/Domain';
-import HistoryIcon from '@mui/icons-material/History';
+import SettingsIcon from '@mui/icons-material/Settings';
+import LockIcon from '@mui/icons-material/Lock';
 import ContactsIcon from '@mui/icons-material/Contacts';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import LogoutIcon from '@mui/icons-material/Logout';
-import LockIcon from '@mui/icons-material/Lock';
-import ApartmentIcon from '@mui/icons-material/Apartment';
-import StoreIcon from '@mui/icons-material/Store';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
-import StickyNote2Icon from '@mui/icons-material/StickyNote2';
-import EmailIcon from '@mui/icons-material/Email';
-import MonitorHeartIcon from '@mui/icons-material/MonitorHeart';
-import EventRepeatIcon from '@mui/icons-material/EventRepeat';
+import AssignmentReturnIcon from '@mui/icons-material/AssignmentReturn';
 import HourglassTopIcon from '@mui/icons-material/HourglassTop';
 import PersonIcon from '@mui/icons-material/Person';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
@@ -45,26 +33,13 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard',        to: '/',                          icon: <DashboardIcon />,      permissions: [],               group: 'General' },
-  { label: 'Approval Center',  to: '/approval-center',           icon: <HourglassTopIcon />,   permissions: [],               group: 'General' },
-  { label: 'Users',            to: '/admin/users',               icon: <PeopleIcon />,         permissions: ['ADMIN_VIEW'],   group: 'Admin' },
-  { label: 'Roles',            to: '/admin/roles',               icon: <SecurityIcon />,       permissions: ['ADMIN_VIEW'],   group: 'Admin' },
-  { label: 'Approval Routing', to: '/admin/approval-routing',    icon: <RuleIcon />,           permissions: ['ADMIN_VIEW'],   group: 'Admin' },
-  { label: 'Departments',      to: '/admin/departments',         icon: <DomainIcon />,         permissions: ['ADMIN_VIEW'],   group: 'Admin' },
-  { label: 'Courier Ways',     to: '/admin/courier-ways',        icon: <AltRouteIcon />,       permissions: ['ADMIN_VIEW'],   group: 'Admin' },
-  { label: 'Package Types',    to: '/admin/package-types',       icon: <InventoryIcon />,      permissions: ['ADMIN_VIEW'],   group: 'Admin' },
-  { label: 'Units',            to: '/admin/units',               icon: <StoreIcon />,          permissions: ['ADMIN_VIEW'],   group: 'Admin' },
-  { label: 'Flex Fields',      to: '/admin/flex-fields',         icon: <TuneIcon />,           permissions: ['ADMIN_VIEW'],   group: 'Admin' },
-  { label: 'Audit Logs',       to: '/admin/audit-logs',          icon: <HistoryIcon />,        permissions: ['ADMIN_VIEW'],   group: 'Admin' },
-  { label: 'Companies',        to: '/admin/companies',           icon: <ApartmentIcon />,      permissions: ['ADMIN_VIEW'],   group: 'Admin' },
-  { label: 'Report Schedules', to: '/admin/report-schedules',    icon: <EventRepeatIcon />,    permissions: ['ADMIN_VIEW'],   group: 'Admin' },
-  { label: 'Password Policy',  to: '/admin/password-policy',     icon: <LockIcon />,           permissions: ['ADMIN_VIEW'],   group: 'Admin' },
-  { label: 'Sticker Config',   to: '/admin/sticker-config',      icon: <StickyNote2Icon />,    permissions: ['ADMIN_VIEW'],   group: 'Admin' },
-  { label: 'Mail Config',      to: '/admin/mail-config',         icon: <EmailIcon />,          permissions: ['ADMIN_VIEW'],   group: 'Admin' },
-  { label: 'System Status',    to: '/admin/system-status',       icon: <MonitorHeartIcon />,   permissions: ['ADMIN_VIEW'],   group: 'Admin' },
+  { label: 'Dashboard',        to: '/',                          icon: <DashboardIcon />,      permissions: [],               group: 'Dashboard' },
+  { label: 'Approval Center',  to: '/approval-center',           icon: <HourglassTopIcon />,   permissions: [],               group: 'Approval Center' },
+  { label: 'Admin',            to: '/admin',                     icon: <SettingsIcon />,       permissions: ['ADMIN_VIEW'],   group: 'Admin' },
   { label: 'Parties',          to: '/master/parties',            icon: <ContactsIcon />,       permissions: ['MASTER_VIEW'],  group: 'Master' },
-  { label: 'Bookings',         to: '/bookings',                  icon: <LocalShippingIcon />,  permissions: ['BOOKING_VIEW'], group: 'Booking' },
-  { label: 'Delivery Challans', to: '/dc',                       icon: <ReceiptLongIcon />,    permissions: ['DELIVERY_CHALLAN_VIEW'], group: 'Booking' },
+  { label: 'Courier Booking',  to: '/bookings',                  icon: <LocalShippingIcon />,  permissions: ['BOOKING_VIEW'], group: 'Courier Booking' },
+  { label: 'DC Booking',       to: '/dc',                        icon: <ReceiptLongIcon />,    permissions: ['DELIVERY_CHALLAN_VIEW'], group: 'DC Booking' },
+  { label: 'DC Receipt',       to: '/dc-receipts',               icon: <AssignmentReturnIcon />, permissions: ['RECEIPT_VIEW'], group: 'DC Receipt' },
   { label: 'Reports',          to: '/reports',                   icon: <AssessmentIcon />,     permissions: ['REPORTS_VIEW'], group: 'Reports' },
 ];
 

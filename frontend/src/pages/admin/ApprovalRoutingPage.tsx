@@ -27,7 +27,7 @@ import type { ApprovalRouting, Role, UserAccount } from '../../types';
 
 type CreatorKind = 'ANY' | 'ROLE' | 'USER';
 type ApproverKind = 'ROLE' | 'USER';
-type Module = 'BOOKING' | 'MASTER';
+type Module = 'BOOKING' | 'MASTER' | 'DELIVERY_CHALLAN';
 
 export default function ApprovalRoutingPage() {
   const { notify } = useNotification();
@@ -132,7 +132,9 @@ export default function ApprovalRoutingPage() {
       headerName: 'Module',
       width: 110,
       renderCell: (p) => (
-        <Chip size="small" label={p.row.module ?? 'BOOKING'} color={p.row.module === 'MASTER' ? 'secondary' : 'primary'} variant="outlined" />
+        <Chip size="small" label={p.row.module ?? 'BOOKING'} variant="outlined" color={
+          p.row.module === 'MASTER' ? 'secondary' : p.row.module === 'DELIVERY_CHALLAN' ? 'warning' : 'primary'
+        } />
       ),
     },
     {
@@ -239,6 +241,7 @@ export default function ApprovalRoutingPage() {
               >
                 <MenuItem value="BOOKING">Booking</MenuItem>
                 <MenuItem value="MASTER">Master (Parties)</MenuItem>
+                <MenuItem value="DELIVERY_CHALLAN">Delivery Challan</MenuItem>
               </Select>
             </FormControl>
 

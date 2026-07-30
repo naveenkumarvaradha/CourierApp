@@ -4,6 +4,7 @@ import { useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
+import AdminHubPage from './pages/admin/AdminHubPage';
 import UsersPage from './pages/admin/UsersPage';
 import RolesPage from './pages/admin/RolesPage';
 import ApprovalRoutingPage from './pages/admin/ApprovalRoutingPage';
@@ -12,6 +13,8 @@ import PackageTypesPage from './pages/admin/PackageTypesPage';
 import UnitsPage from './pages/admin/UnitsPage';
 import DcListPage from './pages/dc/DcListPage';
 import DcFormPage from './pages/dc/DcFormPage';
+import ReceiptListPage from './pages/dc/ReceiptListPage';
+import ReceiptFormPage from './pages/dc/ReceiptFormPage';
 import FlexFieldsPage from './pages/admin/FlexFieldsPage';
 import DepartmentsPage from './pages/admin/DepartmentsPage';
 import AuditLogsPage from './pages/admin/AuditLogsPage';
@@ -70,6 +73,14 @@ export default function App() {
         <Route index element={<DashboardPage />} />
         <Route path="approval-center" element={<ApprovalCenterPage />} />
 
+        <Route
+          path="admin"
+          element={
+            <RequirePermission codes={['ADMIN_VIEW']}>
+              <AdminHubPage />
+            </RequirePermission>
+          }
+        />
         <Route
           path="admin/users"
           element={
@@ -248,6 +259,31 @@ export default function App() {
           element={
             <RequirePermission codes={['DELIVERY_CHALLAN_UPDATE']}>
               <DcFormPage />
+            </RequirePermission>
+          }
+        />
+
+        <Route
+          path="dc-receipts"
+          element={
+            <RequirePermission codes={['RECEIPT_VIEW']}>
+              <ReceiptListPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="dc-receipts/new"
+          element={
+            <RequirePermission codes={['RECEIPT_CREATE']}>
+              <ReceiptFormPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="dc-receipts/:id"
+          element={
+            <RequirePermission codes={['RECEIPT_VIEW']}>
+              <ReceiptFormPage />
             </RequirePermission>
           }
         />

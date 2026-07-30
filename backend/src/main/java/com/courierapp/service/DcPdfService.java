@@ -4,6 +4,7 @@ import com.courierapp.entity.CompanySettings;
 import com.courierapp.entity.DeliveryChallan;
 import com.courierapp.entity.Party;
 import com.courierapp.entity.Unit;
+import com.courierapp.enums.ReceiverType;
 import com.lowagie.text.Chunk;
 import com.lowagie.text.Document;
 import com.lowagie.text.DocumentException;
@@ -40,10 +41,9 @@ public class DcPdfService {
      *  ┌──────────────────────────────────────────────┐
      *  │ [logo]         DELIVERY CHALLAN               │  ← HEADER
      *  │                Company Name                   │
-     *  ├────────────────────┬──────────────────────────┤
-     *  │ DC No: …            │ Date: …                 │
-     *  │ Booking No: …       │ Status: …                │
-     *  ├────────────────────┬──────────────────────────┤
+     *  ├──────────┬──────────┬──────────────────────────┤
+     *  │ DC No: … │ Date: …  │ Status: …                │
+     *  ├──────────┴──────────┴──────────────────────────┤
      *  │ FROM (UNIT)         │ TO (RECEIVER)            │
      *  ├──────────────────────────────────────────────┤
      *  │ Item / Qty / Weight / Package Type / Mode      │
@@ -90,13 +90,13 @@ public class DcPdfService {
             hdrTable.addCell(titleCell);
             doc.add(hdrTable);
 
-            // ── DC NO / DATE / BOOKING NO / STATUS ───────────────────────────
-            PdfPTable metaRow = new PdfPTable(new float[]{50, 50});
+            // ── DC NO / DATE / TYPE / STATUS ──────────────────────────────
+            PdfPTable metaRow = new PdfPTable(new float[]{25, 25, 25, 25});
             metaRow.setWidthPercentage(100);
             metaRow.setSpacingAfter(10);
             metaRow.addCell(metaCell("DC No.", dc.getDcNumber()));
             metaRow.addCell(metaCell("Date", dc.getDcDate().format(DATE_FMT)));
-            metaRow.addCell(metaCell("Booking No.", dc.getBooking().getBookingNumber()));
+            metaRow.addCell(metaCell("Type", dc.getDcType().name().replace('_', ' ')));
             metaRow.addCell(metaCell("Status", dc.getStatus().name()));
             doc.add(metaRow);
 
@@ -128,26 +128,43 @@ public class DcPdfService {
             fromCell.addElement(fromPara);
             fromTo.addCell(fromCell);
 
-            Party receiver = dc.getBooking().getReceiver();
             PdfPCell toCell = new PdfPCell();
             toCell.setPadding(6);
             Paragraph toPara = new Paragraph();
             toPara.add(new Chunk("TO (RECEIVER)\n", F_SECT));
-            if (receiver.getCompanyName() != null && !receiver.getCompanyName().isBlank()) {
-                toPara.add(new Chunk(receiver.getCompanyName() + "\n", F_VAL));
-            }
-            toPara.add(new Chunk(receiver.getPartyName() + "\n", F_VAL_B));
-            toPara.add(new Chunk(receiver.getAddressLine1(), F_VAL));
-            if (receiver.getAddressLine2() != null && !receiver.getAddressLine2().isBlank()) {
-                toPara.add(new Chunk(", " + receiver.getAddressLine2(), F_VAL));
-            }
-            toPara.add(new Chunk("\n" + receiver.getCity() + " - " + receiver.getPincode()
-                    + ", " + receiver.getState() + "\n" + receiver.getCountry(), F_VAL));
-            if (receiver.getPhone() != null && !receiver.getPhone().isBlank()) {
-                toPara.add(new Chunk("\nPh: " + receiver.getPhone(), F_VAL));
-            }
-            if (receiver.getGstin() != null && !receiver.getGstin().isBlank()) {
-                toPara.add(new Chunk("\nGSTIN: " + receiver.getGstin(), F_VAL));
+            if (dc.getReceiverType() == ReceiverType.PARTY) {
+                Party receiver = dc.getReceiverParty();
+                if (receiver.getCompanyName() != null && !receiver.getCompanyName().isBlank()) {
+                    toPara.add(new Chunk(receiver.getCompanyName() + "\n", F_VAL));
+                }
+                toPara.add(new Chunk(receiver.getPartyName() + "\n", F_VAL_B));
+                toPara.add(new Chunk(receiver.getAddressLine1(), F_VAL));
+                if (receiver.getAddressLine2() != null && !receiver.getAddressLine2().isBlank()) {
+                    toPara.add(new Chunk(", " + receiver.getAddressLine2(), F_VAL));
+                }
+                toPara.add(new Chunk("\n" + receiver.getCity() + " - " + receiver.getPincode()
+                        + ", " + receiver.getState() + "\n" + receiver.getCountry(), F_VAL));
+                if (receiver.getPhone() != null && !receiver.getPhone().isBlank()) {
+                    toPara.add(new Chunk("\nPh: " + receiver.getPhone(), F_VAL));
+                }
+                if (receiver.getGstin() != null && !receiver.getGstin().isBlank()) {
+                    toPara.add(new Chunk("\nGSTIN: " + receiver.getGstin(), F_VAL));
+                }
+            } else {
+                Unit receiver = dc.getReceiverUnit();
+                toPara.add(new Chunk(receiver.getUnitName() + "\n", F_VAL_B));
+                toPara.add(new Chunk(receiver.getAddressLine1(), F_VAL));
+                if (receiver.getAddressLine2() != null && !receiver.getAddressLine2().isBlank()) {
+                    toPara.add(new Chunk(", " + receiver.getAddressLine2(), F_VAL));
+                }
+                toPara.add(new Chunk("\n" + receiver.getCity() + " - " + receiver.getPincode()
+                        + ", " + receiver.getState() + "\n" + receiver.getCountry(), F_VAL));
+                if (receiver.getPhone() != null && !receiver.getPhone().isBlank()) {
+                    toPara.add(new Chunk("\nPh: " + receiver.getPhone(), F_VAL));
+                }
+                if (receiver.getGstin() != null && !receiver.getGstin().isBlank()) {
+                    toPara.add(new Chunk("\nGSTIN: " + receiver.getGstin(), F_VAL));
+                }
             }
             toCell.addElement(toPara);
             fromTo.addCell(toCell);
@@ -161,11 +178,11 @@ public class DcPdfService {
             itemTable.addCell(headerCell("Packages"));
             itemTable.addCell(headerCell("Weight (kg)"));
             itemTable.addCell(headerCell("Mode"));
-            itemTable.addCell(valueCell(dc.getBooking().getItemDescription()));
-            itemTable.addCell(valueCell(String.valueOf(dc.getBooking().getNoOfPackages())));
-            itemTable.addCell(valueCell(String.valueOf(dc.getBooking().getWeightKg())));
-            String mode = dc.getBooking().getCourierMode().name()
-                    + (dc.getBooking().getCourierWay() != null ? " / " + dc.getBooking().getCourierWay().getName() : "");
+            itemTable.addCell(valueCell(dc.getItemDescription()));
+            itemTable.addCell(valueCell(String.valueOf(dc.getNoOfPackages())));
+            itemTable.addCell(valueCell(String.valueOf(dc.getWeightKg())));
+            String mode = dc.getCourierMode().name()
+                    + (dc.getCourierWay() != null ? " / " + dc.getCourierWay().getName() : "");
             itemTable.addCell(valueCell(mode));
             doc.add(itemTable);
 

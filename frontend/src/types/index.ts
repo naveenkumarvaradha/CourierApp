@@ -287,17 +287,46 @@ export interface Booking {
   pendingApprovers?: string[] | null;
 }
 
-export type DcStatus = 'DRAFT' | 'ISSUED' | 'DELIVERED';
+export type DcStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'ISSUED' | 'DELIVERED' | 'RETURNED';
+export type ReceiverType = 'PARTY' | 'UNIT';
+export type DcType = 'RETURNABLE' | 'NON_RETURNABLE';
 
 export interface DeliveryChallan {
   id: number;
   dcNumber: string;
   dcDate: string;
-  booking: Booking;
+  dcType: DcType;
   unit: Unit;
+  receiverType: ReceiverType;
+  receiverParty: Party | null;
+  receiverUnit: Unit | null;
+  courierWay: CourierWay | null;
+  packageType: PackageType | null;
+  itemDescription: string;
+  weightKg: number;
+  noOfPackages: number;
+  courierMode: CourierMode;
   vehicleNumber: string | null;
   driverName: string | null;
   status: DcStatus;
+  remarks: string | null;
+  currentApprovalLevel: number;
+  approverUsername: string | null;
+  approvalTimestamp: string | null;
+  approvalRemarks: string | null;
+  createdAt: string | null;
+  createdBy: string | null;
+  updatedAt: string | null;
+  updatedBy: string | null;
+  pendingApprovers?: string[] | null;
+}
+
+export interface DcReceipt {
+  id: number;
+  receiptNumber: string;
+  receiptDate: string;
+  dc: DeliveryChallan;
+  receivedBy: string | null;
   remarks: string | null;
   createdAt: string | null;
   createdBy: string | null;

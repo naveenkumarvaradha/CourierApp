@@ -16,11 +16,6 @@ export const dcApiSlice = baseApi.injectEndpoints({
       query: (id) => ({ url: `/dc/${id}` }),
       providesTags: (_r, _e, id) => [{ type: 'DeliveryChallan', id }],
     }),
-    getDcByBooking: build.query<DeliveryChallan | null, number>({
-      query: (bookingId) => ({ url: `/dc/by-booking/${bookingId}` }),
-      transformResponse: (response: DeliveryChallan | '' | null | undefined) => response || null,
-      providesTags: ['DeliveryChallan'],
-    }),
     createDc: build.mutation<DeliveryChallan, Record<string, unknown>>({
       query: (data) => ({ url: '/dc', method: 'POST', data }),
       invalidatesTags: ['DeliveryChallan'],
@@ -37,15 +32,29 @@ export const dcApiSlice = baseApi.injectEndpoints({
       query: ({ id, status }) => ({ url: `/dc/${id}/status`, method: 'POST', data: { status } }),
       invalidatesTags: (_r, _e, { id }) => [{ type: 'DeliveryChallan', id }, 'DeliveryChallan'],
     }),
+    submitDc: build.mutation<DeliveryChallan, number>({
+      query: (id) => ({ url: `/dc/${id}/submit`, method: 'POST' }),
+      invalidatesTags: (_r, _e, id) => [{ type: 'DeliveryChallan', id }, 'DeliveryChallan'],
+    }),
+    approveDc: build.mutation<DeliveryChallan, { id: number; remarks: string }>({
+      query: ({ id, remarks }) => ({ url: `/dc/${id}/approve`, method: 'POST', data: { remarks } }),
+      invalidatesTags: (_r, _e, { id }) => [{ type: 'DeliveryChallan', id }, 'DeliveryChallan'],
+    }),
+    rejectDc: build.mutation<DeliveryChallan, { id: number; remarks: string }>({
+      query: ({ id, remarks }) => ({ url: `/dc/${id}/reject`, method: 'POST', data: { remarks } }),
+      invalidatesTags: (_r, _e, { id }) => [{ type: 'DeliveryChallan', id }, 'DeliveryChallan'],
+    }),
   }),
 });
 
 export const {
   useSearchDcsQuery,
   useGetDcQuery,
-  useGetDcByBookingQuery,
   useCreateDcMutation,
   useUpdateDcMutation,
   useDeleteDcMutation,
   useChangeDcStatusMutation,
+  useSubmitDcMutation,
+  useApproveDcMutation,
+  useRejectDcMutation,
 } = dcApiSlice;

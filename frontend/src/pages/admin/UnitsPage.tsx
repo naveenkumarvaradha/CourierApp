@@ -20,7 +20,8 @@ import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { adminApi } from '../../api/endpoints';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import { adminApi, bookingApi } from '../../api/endpoints';
 import { extractErrorMessage } from '../../api/client';
 import { useNotification } from '../../context/NotificationContext';
 import { useAuth } from '../../context/AuthContext';
@@ -54,6 +55,11 @@ export default function UnitsPage() {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY);
+  const [companyName, setCompanyName] = useState<string>('');
+
+  useEffect(() => {
+    bookingApi.myCompanySettings().then((s) => setCompanyName(s.companyName)).catch(() => undefined);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -84,6 +90,23 @@ export default function UnitsPage() {
       gstin: u.gstin ?? '',
       defaultUnit: u.defaultUnit,
       active: u.active,
+    });
+    setOpen(true);
+  };
+  const openCopy = (u: Unit) => {
+    setForm({
+      unitName: '',
+      addressLine1: u.addressLine1,
+      addressLine2: u.addressLine2 ?? '',
+      city: u.city,
+      state: u.state,
+      pincode: u.pincode,
+      country: u.country,
+      phone: u.phone ?? '',
+      email: u.email ?? '',
+      gstin: u.gstin ?? '',
+      defaultUnit: false,
+      active: true,
     });
     setOpen(true);
   };
@@ -155,7 +178,7 @@ export default function UnitsPage() {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 120,
+      width: 155,
       sortable: false,
       renderCell: (params) => (
         <Stack direction="row">
@@ -163,6 +186,13 @@ export default function UnitsPage() {
             <Tooltip title="Edit">
               <IconButton size="small" onClick={() => openEdit(params.row)}>
                 <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+          {hasPermission('ADMIN_CREATE') && (
+            <Tooltip title="Copy to new unit">
+              <IconButton size="small" onClick={() => openCopy(params.row)}>
+                <ContentCopyIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           )}
@@ -202,6 +232,10 @@ export default function UnitsPage() {
         <DialogTitle>{form.id ? 'Edit Unit' : 'Add Unit'}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} mt={0.5}>
+            <Grid item xs={12}>
+              <TextField label="Company Name" fullWidth value={companyName} disabled
+                helperText="Set in Admin → Company Settings — shown here for reference only" />
+            </Grid>
             <Grid item xs={12}>
               <TextField label="Unit Name *" fullWidth autoFocus value={form.unitName}
                 onChange={(e) => setForm({ ...form, unitName: e.target.value })}

@@ -1,11 +1,16 @@
 package com.courierapp.controller;
 
 import com.courierapp.dto.PageResponse;
+import com.courierapp.dto.approval.ApprovalInfoResponse;
+import com.courierapp.dto.booking.ApprovalDecisionRequest;
 import com.courierapp.dto.dc.DcRequest;
 import com.courierapp.dto.dc.DcResponse;
 import com.courierapp.dto.dc.DcStatusUpdateRequest;
+import com.courierapp.entity.DeliveryChallan;
 import com.courierapp.enums.DcStatus;
+import com.courierapp.exception.ResourceNotFoundException;
 import com.courierapp.repository.DeliveryChallanRepository;
+import com.courierapp.service.ApprovalAuthorizationService;
 import com.courierapp.service.DeliveryChallanService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,9 +24,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -29,13 +36,18 @@ import java.time.LocalDate;
 @Tag(name = "Delivery Challans")
 public class DeliveryChallanController {
 
+    private static final String MODULE = "DELIVERY_CHALLAN";
+
     private final DeliveryChallanService deliveryChallanService;
     private final DeliveryChallanRepository deliveryChallanRepository;
+    private final ApprovalAuthorizationService approvalAuthorizationService;
 
     public DeliveryChallanController(DeliveryChallanService deliveryChallanService,
-                                     DeliveryChallanRepository deliveryChallanRepository) {
+                                     DeliveryChallanRepository deliveryChallanRepository,
+                                     ApprovalAuthorizationService approvalAuthorizationService) {
         this.deliveryChallanService = deliveryChallanService;
         this.deliveryChallanRepository = deliveryChallanRepository;
+        this.approvalAuthorizationService = approvalAuthorizationService;
     }
 
     @GetMapping
@@ -53,15 +65,6 @@ public class DeliveryChallanController {
     @PreAuthorize("hasAuthority('DELIVERY_CHALLAN_VIEW')")
     public DcResponse get(@PathVariable Long id) {
         return deliveryChallanService.get(id);
-    }
-
-    @GetMapping("/by-booking/{bookingId}")
-    @PreAuthorize("hasAuthority('DELIVERY_CHALLAN_VIEW')")
-    @Operation(summary = "Check whether a booking already has a delivery challan, and fetch it if so")
-    public ResponseEntity<DcResponse> getByBooking(@PathVariable Long bookingId) {
-        return deliveryChallanRepository.findByBookingId(bookingId)
-                .map(dc -> ResponseEntity.ok(deliveryChallanService.get(dc.getId())))
-                .orElse(ResponseEntity.noContent().build());
     }
 
     @PostMapping
@@ -88,6 +91,42 @@ public class DeliveryChallanController {
     @PreAuthorize("hasAuthority('DELIVERY_CHALLAN_UPDATE')")
     public DcResponse changeStatus(@PathVariable Long id, @Valid @RequestBody DcStatusUpdateRequest request) {
         return deliveryChallanService.changeStatus(id, request.status());
+    }
+
+    @PostMapping("/{id}/submit")
+    @PreAuthorize("hasAuthority('DELIVERY_CHALLAN_UPDATE')")
+    public DcResponse submit(@PathVariable Long id) {
+        return deliveryChallanService.submitForApproval(id);
+    }
+
+    @PostMapping("/{id}/approve")
+    @PreAuthorize("hasAuthority('DELIVERY_CHALLAN_APPROVE')")
+    public DcResponse approve(@PathVariable Long id,
+                             @Valid @RequestBody(required = false) ApprovalDecisionRequest request,
+                             Authentication authentication) {
+        return deliveryChallanService.approve(id, request, authentication.getName());
+    }
+
+    @PostMapping("/{id}/reject")
+    @PreAuthorize("hasAuthority('DELIVERY_CHALLAN_APPROVE')")
+    public DcResponse reject(@PathVariable Long id,
+                            @Valid @RequestBody(required = false) ApprovalDecisionRequest request,
+                            Authentication authentication) {
+        return deliveryChallanService.reject(id, request, authentication.getName());
+    }
+
+    @GetMapping("/{id}/approval-info")
+    @PreAuthorize("hasAuthority('DELIVERY_CHALLAN_VIEW')")
+    public ApprovalInfoResponse approvalInfo(@PathVariable Long id) {
+        DeliveryChallan dc = deliveryChallanRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Delivery challan", id));
+        String creator = dc.getCreatedBy();
+        int currentLevel = dc.getCurrentApprovalLevel();
+        int maxLevel = approvalAuthorizationService.getMaxLevel(creator, MODULE);
+        List<String> approvers = approvalAuthorizationService
+                .resolveApproversAtLevel(creator, MODULE, currentLevel);
+        String summary = "Level " + currentLevel + " of " + maxLevel;
+        return new ApprovalInfoResponse(currentLevel, maxLevel, approvers, summary);
     }
 
     @GetMapping(value = "/{id}/print", produces = MediaType.APPLICATION_PDF_VALUE)

@@ -53,6 +53,8 @@ export const approvalApi = {
     api.get<ApprovalInfo>(`/bookings/${id}/approval-info`).then((r) => r.data),
   partyInfo: (id: number) =>
     api.get<ApprovalInfo>(`/master/parties/${id}/approval-info`).then((r) => r.data),
+  dcInfo: (id: number) =>
+    api.get<ApprovalInfo>(`/dc/${id}/approval-info`).then((r) => r.data),
 };
 
 // ---------- Auth ----------

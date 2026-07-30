@@ -5,5 +5,6 @@ public enum ModuleType {
     MASTER,
     BOOKING,
     REPORTS,
-    DELIVERY_CHALLAN
+    DELIVERY_CHALLAN,
+    RECEIPT
 }
