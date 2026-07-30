@@ -1,6 +1,5 @@
 # Backend
 backend/target/
-microservices/*/target/
 *.class
 *.jar
 

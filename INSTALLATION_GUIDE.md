@@ -6,7 +6,7 @@ Step-by-step setup for running ShipDesk locally on Windows 11. Skip a section if
 
 ## 1. Java 25 (JDK)
 
-The backend and microservices now target Java 25 for development and runtime.
+The backend now targets Java 25 for development and runtime.
 
 1. Download **Eclipse Temurin 25 (LTS)**: https://adoptium.net/temurin/releases/?version=25 → pick `.msi` for Windows x64.
 2. Run the installer. On the "Custom Setup" screen, enable:
