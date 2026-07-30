@@ -93,7 +93,7 @@ public class DashboardController {
                     List<String> approvers = approvalAuthorizationService
                             .resolveApproversAtLevel(b.getCreatedBy(), "BOOKING", b.getCurrentApprovalLevel());
                     return new BookingResponse(base.id(), base.bookingNumber(), base.bookingDate(),
-                            base.sender(), base.receiver(), base.courierWay(), base.packageType(),
+                            base.sender(), base.receiver(), base.courierWay(), base.packageType(), base.unit(),
                             base.itemDescription(), base.weightKg(), base.noOfPackages(),
                             base.courierMode(), base.specialInstructions(), base.status(),
                             base.awbNumber(), base.approverUsername(), base.approvalTimestamp(),
@@ -233,7 +233,7 @@ public class DashboardController {
                         List<String> approvers = approvalAuthorizationService
                                 .resolveApproversAtLevel(b.getCreatedBy(), "BOOKING", b.getCurrentApprovalLevel());
                         return new BookingResponse(base.id(), base.bookingNumber(), base.bookingDate(),
-                                base.sender(), base.receiver(), base.courierWay(), base.packageType(),
+                                base.sender(), base.receiver(), base.courierWay(), base.packageType(), base.unit(),
                                 base.itemDescription(), base.weightKg(), base.noOfPackages(),
                                 base.courierMode(), base.specialInstructions(), base.status(),
                                 base.awbNumber(), base.approverUsername(), base.approvalTimestamp(),

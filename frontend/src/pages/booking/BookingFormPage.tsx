@@ -21,12 +21,13 @@ import { useCreateBookingMutation, useUpdateBookingMutation } from '../../store/
 import { extractErrorMessage } from '../../api/client';
 import { useNotification } from '../../context/NotificationContext';
 import FlexFieldsSection from '../../components/FlexFieldsSection';
-import type { ApprovalInfo, Booking, CompanySettings, CourierWay, FlexFieldValues, PackageType, Party } from '../../types';
+import type { ApprovalInfo, Booking, CompanySettings, CourierWay, FlexFieldValues, PackageType, Party, Unit } from '../../types';
 
 interface FormValues {
   receiverId: number | '';
   courierWayId: number | '';
   packageTypeId: number | '';
+  unitId: number | '';
   itemDescription: string;
   weightKg: number | '';
   noOfPackages: number | '';
@@ -39,6 +40,7 @@ const DEFAULTS: FormValues = {
   receiverId: '',
   courierWayId: '',
   packageTypeId: '',
+  unitId: '',
   itemDescription: '',
   weightKg: '',
   noOfPackages: 1,
@@ -76,6 +78,7 @@ export default function BookingFormPage() {
   const [parties, setParties] = useState<Party[]>([]);
   const [courierWays, setCourierWays] = useState<CourierWay[]>([]);
   const [packageTypes, setPackageTypes] = useState<PackageType[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
   const [company, setCompany] = useState<CompanySettings | null>(null);
   const [flexValues, setFlexValues] = useState<FlexFieldValues>({});
   const [booking, setBooking] = useState<Booking | null>(null);
@@ -86,6 +89,7 @@ export default function BookingFormPage() {
     control,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ defaultValues: DEFAULTS });
 
@@ -99,8 +103,21 @@ export default function BookingFormPage() {
       .catch(() => undefined);
     adminApi.listActiveCourierWays().then(setCourierWays).catch(() => undefined);
     adminApi.listActivePackageTypes().then(setPackageTypes).catch(() => undefined);
+    adminApi.listActiveUnits().then((list) => {
+      setUnits(list);
+      // Auto-select when creating: the only unit, or the company's default unit
+      if (!isEdit) {
+        if (list.length === 1) {
+          setValue('unitId', list[0].id);
+        } else {
+          const def = list.find((u) => u.defaultUnit);
+          if (def) setValue('unitId', def.id);
+        }
+      }
+    }).catch(() => undefined);
     // Load sender address from the logged-in user's own company
     bookingApi.myCompanySettings().then(setCompany).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -111,6 +128,7 @@ export default function BookingFormPage() {
           receiverId: b.receiver.id,
           courierWayId: b.courierWay?.id ?? '',
           packageTypeId: b.packageType?.id ?? '',
+          unitId: b.unit?.id ?? '',
           itemDescription: b.itemDescription,
           weightKg: b.weightKg,
           noOfPackages: b.noOfPackages,
@@ -133,6 +151,7 @@ export default function BookingFormPage() {
       receiverId: Number(values.receiverId),
       courierWayId: Number(values.courierWayId),
       packageTypeId: values.packageTypeId !== '' ? Number(values.packageTypeId) : null,
+      unitId: values.unitId !== '' ? Number(values.unitId) : null,
       itemDescription: values.itemDescription,
       weightKg: Number(values.weightKg),
       noOfPackages: Number(values.noOfPackages),
@@ -194,7 +213,14 @@ export default function BookingFormPage() {
             <Grid container spacing={2} mb={2}>
               <Grid item xs={6} sm={4}><ReadOnlyField label="Created By" value={booking.createdBy} /></Grid>
               <Grid item xs={6} sm={4}><ReadOnlyField label="Company" value={company?.companyName} /></Grid>
-              <Grid item xs={6} sm={4}><ReadOnlyField label="Address" value={company ? `${company.addressLine1}, ${company.city}` : undefined} /></Grid>
+              <Grid item xs={6} sm={4}>
+                <ReadOnlyField
+                  label="Address"
+                  value={booking.unit
+                    ? `${booking.unit.unitName} — ${booking.unit.addressLine1}, ${booking.unit.city}`
+                    : (company ? `${company.addressLine1}, ${company.city}` : undefined)}
+                />
+              </Grid>
             </Grid>
 
             <Divider sx={{ mb: 2 }} />
@@ -271,8 +297,8 @@ export default function BookingFormPage() {
           <form onSubmit={handleSubmit(onSubmit)}>
             <Grid container spacing={2}>
 
-              {/* Row 1: Receiver, Courier Way, Package Type */}
-              <Grid item xs={12} sm={4}>
+              {/* Row 1: Receiver, Courier Way, Package Type, Unit */}
+              <Grid item xs={12} sm={3}>
                 <Controller name="receiverId" control={control} rules={{ required: 'Receiver is required' }}
                   render={({ field }) => (
                     <TextField {...field} select label="Receiver *" fullWidth
@@ -285,7 +311,7 @@ export default function BookingFormPage() {
                     </TextField>
                   )} />
               </Grid>
-              <Grid item xs={12} sm={4}>
+              <Grid item xs={12} sm={3}>
                 <Controller name="courierWayId" control={control} rules={{ required: 'Courier way is required' }}
                   render={({ field }) => (
                     <TextField {...field} select label="Courier Way *" fullWidth
@@ -296,7 +322,7 @@ export default function BookingFormPage() {
                     </TextField>
                   )} />
               </Grid>
-              <Grid item xs={12} sm={4}>
+              <Grid item xs={12} sm={3}>
                 <Controller name="packageTypeId" control={control}
                   rules={{ required: 'Package type is required' }}
                   render={({ field }) => (
@@ -305,6 +331,20 @@ export default function BookingFormPage() {
                       <MenuItem value=""><em>Select</em></MenuItem>
                       {packageTypes.map((pt) => (
                         <MenuItem key={pt.id} value={pt.id}>{pt.name}</MenuItem>
+                      ))}
+                    </TextField>
+                  )} />
+              </Grid>
+              <Grid item xs={12} sm={3}>
+                <Controller name="unitId" control={control}
+                  render={({ field }) => (
+                    <TextField {...field} select label="Sending Unit" fullWidth
+                      helperText="Controls the FROM address on the sticker/DC">
+                      <MenuItem value=""><em>None (use company address)</em></MenuItem>
+                      {units.map((u) => (
+                        <MenuItem key={u.id} value={u.id}>
+                          {u.unitName}{u.defaultUnit ? ' (Default)' : ''}
+                        </MenuItem>
                       ))}
                     </TextField>
                   )} />

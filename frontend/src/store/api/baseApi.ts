@@ -23,6 +23,6 @@ const axiosBaseQuery: BaseQueryFn<AxiosArgs, unknown, { status?: number; data?: 
 export const baseApi = createApi({
   reducerPath: 'api',
   baseQuery: axiosBaseQuery,
-  tagTypes: ['DashboardTasks', 'ReportSummary', 'Booking', 'Party', 'CourierWay', 'PackageType', 'Department', 'User', 'Role', 'ApprovalRouting', 'CompanySettings'],
+  tagTypes: ['DashboardTasks', 'ReportSummary', 'Booking', 'Party', 'CourierWay', 'PackageType', 'Department', 'User', 'Role', 'ApprovalRouting', 'CompanySettings', 'DeliveryChallan', 'DcReceipt'],
   endpoints: () => ({}),
 });

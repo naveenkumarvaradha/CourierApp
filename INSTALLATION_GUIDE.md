@@ -4,11 +4,11 @@ Step-by-step setup for running ShipDesk locally on Windows 11. Skip a section if
 
 ---
 
-## 1. Java 17 (JDK)
+## 1. Java 25 (JDK)
 
-The backend targets Java 17. Production runs JDK 25, but dev uses 17.
+The backend and microservices now target Java 25 for development and runtime.
 
-1. Download **Eclipse Temurin 17 (LTS)**: https://adoptium.net/temurin/releases/?version=17 → pick `.msi` for Windows x64.
+1. Download **Eclipse Temurin 25 (LTS)**: https://adoptium.net/temurin/releases/?version=25 → pick `.msi` for Windows x64.
 2. Run the installer. On the "Custom Setup" screen, enable:
    - "Add to PATH"
    - "Set JAVA_HOME variable"
@@ -16,10 +16,10 @@ The backend targets Java 17. Production runs JDK 25, but dev uses 17.
    ```powershell
    java -version
    ```
-   Expect `openjdk version "17.0.x"`.
+   Expect `openjdk version "25.0.x"`.
 4. If you have multiple JDKs and `java -version` shows the wrong one, set `JAVA_HOME` for this project:
    ```powershell
-   $env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-17.0.x-hotspot"
+   $env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-25.0.x-hotspot"
    $env:Path = "$env:JAVA_HOME\bin;" + $env:Path
    ```
    Add this to your PowerShell profile (`notepad $PROFILE`) to persist it.
@@ -35,7 +35,7 @@ The backend targets Java 17. Production runs JDK 25, but dev uses 17.
    ```powershell
    mvn -v
    ```
-   Confirm it reports `Java version: 17.0.x` (from step 1). If not, fix `JAVA_HOME` first.
+   Confirm it reports `Java version: 25.0.x` (from step 1). If not, fix `JAVA_HOME` first.
 
 ---
 
@@ -94,7 +94,7 @@ Install:
 1. Download from https://www.jetbrains.com/idea/download/?section=windows (Community is free; this machine already has IntelliJ 2025.3.2 installed per the JDK scan — you likely already have this).
 2. On first launch, install the **Lombok plugin** if not bundled (Settings → Plugins → search "Lombok" → Install) and enable annotation processing: Settings → Build, Execution, Deployment → Compiler → Annotation Processors → check "Enable annotation processing".
 3. Open the project: File → Open → select `D:\Application\CourierApp\backend` (open the `backend` folder specifically, as its own Maven project; or open the parent `CourierApp` folder and let IntelliJ detect both Maven and Node submodules).
-4. Configure Project SDK: File → Project Structure → Project → SDK → Add SDK → JDK 17 install path.
+4. Configure Project SDK: File → Project Structure → Project → SDK → Add SDK → JDK 25 install path.
 5. Right-click `pom.xml` → Maven → Reload Project to fetch dependencies.
 
 ### Frontend (React/TypeScript): **Visual Studio Code**
@@ -122,8 +122,8 @@ You can also just open the whole `CourierApp` folder in VS Code if you'd rather 
 
 ```powershell
 # 1. Verify tool versions
-java -version      # 17.0.x
-mvn -v             # reports Java 17
+java -version      # 25.0.x
+mvn -v             # reports Java 25
 node -v            # v18+ or v20 LTS
 psql --version     # 16.x or 18.x
 
@@ -161,8 +161,8 @@ npm run dev
 
 | Symptom | Fix |
 |---|---|
-| `mvn` reports wrong Java version | Re-check `JAVA_HOME` points at JDK 17, open a fresh terminal |
-| Lombok compile errors (`TypeTag :: UNKNOWN`) | Compiling with JDK 25+ — switch to JDK 17 via `JAVA_HOME` |
+| `mvn` reports wrong Java version | Re-check `JAVA_HOME` points at JDK 25, open a fresh terminal |
+| Lombok compile errors (`TypeTag :: UNKNOWN`) | Compiling with JDK 25+ — ensure `JAVA_HOME` points at JDK 25 and annotation processing is enabled |
 | Backend: `Connection refused` to PostgreSQL | Confirm `postgresql-*` Windows service is Running, port 5432 open |
 | Backend: `password authentication failed` | DB_USERNAME/DB_PASSWORD mismatch — re-check values |
 | Backend: `Unable to start Redis` | Ensure Redis service is running on port 6379 |

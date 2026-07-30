@@ -78,6 +78,11 @@ public class Booking extends Auditable {
     @JoinColumn(name = "package_type_id")
     private PackageType packageType;
 
+    /** The sending branch/unit — controls which address prints as the shipment origin. Optional. */
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "unit_id")
+    private Unit unit;
+
     @Column(name = "awb_number", unique = true, length = 60)
     private String awbNumber;
 

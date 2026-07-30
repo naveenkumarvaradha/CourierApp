@@ -4,5 +4,7 @@ public enum ModuleType {
     ADMIN,
     MASTER,
     BOOKING,
-    REPORTS
+    REPORTS,
+    DELIVERY_CHALLAN,
+    RECEIPT
 }

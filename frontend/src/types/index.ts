@@ -207,6 +207,22 @@ export interface PackageType {
   active: boolean;
 }
 
+export interface Unit {
+  id: number;
+  unitName: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  pincode: string;
+  country: string;
+  phone: string | null;
+  email: string | null;
+  gstin: string | null;
+  defaultUnit: boolean;
+  active: boolean;
+}
+
 export type FlexFieldType = 'TEXT' | 'DROPDOWN_SINGLE' | 'DROPDOWN_MULTI';
 
 export interface FlexFieldOption {
@@ -251,6 +267,7 @@ export interface Booking {
   receiver: Party;
   courierWay: CourierWay | null;
   packageType: PackageType | null;
+  unit: Unit | null;
   itemDescription: string;
   weightKg: number;
   noOfPackages: number;
@@ -268,6 +285,53 @@ export interface Booking {
   createdAt: string | null;
   createdBy: string | null;
   pendingApprovers?: string[] | null;
+}
+
+export type DcStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'ISSUED' | 'DELIVERED' | 'RETURNED';
+export type ReceiverType = 'PARTY' | 'UNIT';
+export type DcType = 'RETURNABLE' | 'NON_RETURNABLE';
+
+export interface DeliveryChallan {
+  id: number;
+  dcNumber: string;
+  dcDate: string;
+  dcType: DcType;
+  unit: Unit;
+  receiverType: ReceiverType;
+  receiverParty: Party | null;
+  receiverUnit: Unit | null;
+  courierWay: CourierWay | null;
+  packageType: PackageType | null;
+  itemDescription: string;
+  weightKg: number;
+  noOfPackages: number;
+  courierMode: CourierMode;
+  vehicleNumber: string | null;
+  driverName: string | null;
+  status: DcStatus;
+  remarks: string | null;
+  currentApprovalLevel: number;
+  approverUsername: string | null;
+  approvalTimestamp: string | null;
+  approvalRemarks: string | null;
+  createdAt: string | null;
+  createdBy: string | null;
+  updatedAt: string | null;
+  updatedBy: string | null;
+  pendingApprovers?: string[] | null;
+}
+
+export interface DcReceipt {
+  id: number;
+  receiptNumber: string;
+  receiptDate: string;
+  dc: DeliveryChallan;
+  receivedBy: string | null;
+  remarks: string | null;
+  createdAt: string | null;
+  createdBy: string | null;
+  updatedAt: string | null;
+  updatedBy: string | null;
 }
 
 export interface PartyBreakdown {

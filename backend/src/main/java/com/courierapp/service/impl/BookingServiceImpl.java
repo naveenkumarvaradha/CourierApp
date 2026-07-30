@@ -11,6 +11,7 @@ import com.courierapp.entity.CompanySettings;
 import com.courierapp.entity.CourierWay;
 import com.courierapp.entity.PackageType;
 import com.courierapp.entity.Party;
+import com.courierapp.entity.Unit;
 import com.courierapp.entity.User;
 import com.courierapp.enums.BookingStatus;
 import com.courierapp.enums.CourierMode;
@@ -22,6 +23,7 @@ import com.courierapp.repository.CompanySettingsRepository;
 import com.courierapp.repository.CourierWayRepository;
 import com.courierapp.repository.PackageTypeRepository;
 import com.courierapp.repository.PartyRepository;
+import com.courierapp.repository.UnitRepository;
 import com.courierapp.repository.UserRepository;
 import com.courierapp.service.ApprovalAuthorizationService;
 import com.courierapp.service.AuditLogService;
@@ -72,6 +74,7 @@ public class BookingServiceImpl implements BookingService {
     private final AuditLogService auditLogService;
     private final com.courierapp.repository.StickerFieldConfigRepository stickerFieldConfigRepository;
     private final com.courierapp.kafka.CourierEventProducer eventProducer;
+    private final UnitRepository unitRepository;
 
     public BookingServiceImpl(BookingRepository bookingRepository,
                               PartyRepository partyRepository,
@@ -85,7 +88,8 @@ public class BookingServiceImpl implements BookingService {
                               ApprovalAuthorizationService approvalAuthorizationService,
                               AuditLogService auditLogService,
                               com.courierapp.repository.StickerFieldConfigRepository stickerFieldConfigRepository,
-                              com.courierapp.kafka.CourierEventProducer eventProducer) {
+                              com.courierapp.kafka.CourierEventProducer eventProducer,
+                              UnitRepository unitRepository) {
         this.bookingRepository = bookingRepository;
         this.partyRepository = partyRepository;
         this.companySettingsRepository = companySettingsRepository;
@@ -98,6 +102,7 @@ public class BookingServiceImpl implements BookingService {
         this.approvalAuthorizationService = approvalAuthorizationService;
         this.auditLogService = auditLogService;
         this.stickerFieldConfigRepository = stickerFieldConfigRepository;
+        this.unitRepository = unitRepository;
         this.eventProducer = eventProducer;
     }
 
@@ -298,7 +303,7 @@ public class BookingServiceImpl implements BookingService {
             }
         }
 
-        byte[] pdf = stickerPdfService.generate(booking, creator, settings, fieldConfig);
+        byte[] pdf = stickerPdfService.generate(booking, creator, settings, booking.getUnit(), fieldConfig);
 
         // Mark print as taken
         if (!booking.isPrintTaken()) {
@@ -419,11 +424,17 @@ public class BookingServiceImpl implements BookingService {
             packageType = packageTypeRepository.findById(r.packageTypeId())
                     .orElseThrow(() -> new ResourceNotFoundException("Package type", r.packageTypeId()));
         }
+        Unit unit = null;
+        if (r.unitId() != null) {
+            unit = unitRepository.findById(r.unitId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Unit", r.unitId()));
+        }
         booking.setBookingDate(bookingDate);
         booking.setSender(sender);
         booking.setReceiver(receiver);
         booking.setCourierWay(courierWay);
         booking.setPackageType(packageType);
+        booking.setUnit(unit);
         booking.setItemDescription(r.itemDescription());
         booking.setWeightKg(r.weightKg());
         booking.setNoOfPackages(r.noOfPackages());

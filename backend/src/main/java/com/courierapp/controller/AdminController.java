@@ -297,6 +297,46 @@ public class AdminController {
         return ResponseEntity.noContent().build();
     }
 
+    // ----- Units (company branches/addresses) -----
+
+    @GetMapping("/units")
+    @PreAuthorize("hasAuthority('ADMIN_VIEW')")
+    @Operation(summary = "List all units for the current company")
+    public List<UnitResponse> listUnits() {
+        return adminService.listUnits();
+    }
+
+    @GetMapping("/units/active")
+    @PreAuthorize("hasAuthority('ADMIN_VIEW') or hasAuthority('BOOKING_CREATE') or hasAuthority('BOOKING_UPDATE') " +
+            "or hasAuthority('DELIVERY_CHALLAN_CREATE') or hasAuthority('DELIVERY_CHALLAN_UPDATE')")
+    @Operation(summary = "List active units (for booking/DC dropdowns)")
+    public List<UnitResponse> listActiveUnits() {
+        return adminService.listActiveUnits();
+    }
+
+    @PostMapping("/units")
+    @PreAuthorize("hasAuthority('ADMIN_CREATE')")
+    @ResponseStatus(HttpStatus.CREATED)
+    public UnitResponse createUnit(@Valid @RequestBody UnitRequest request) {
+        log.info("POST /admin/units name={}", request.unitName());
+        return adminService.createUnit(request);
+    }
+
+    @PutMapping("/units/{id}")
+    @PreAuthorize("hasAuthority('ADMIN_UPDATE')")
+    public UnitResponse updateUnit(@PathVariable Long id, @Valid @RequestBody UnitRequest request) {
+        log.info("PUT /admin/units/{}", id);
+        return adminService.updateUnit(id, request);
+    }
+
+    @DeleteMapping("/units/{id}")
+    @PreAuthorize("hasAuthority('ADMIN_DELETE')")
+    public ResponseEntity<Void> deleteUnit(@PathVariable Long id) {
+        log.info("DELETE /admin/units/{}", id);
+        adminService.deleteUnit(id);
+        return ResponseEntity.noContent().build();
+    }
+
     // ----- Departments -----
 
     @GetMapping("/departments")

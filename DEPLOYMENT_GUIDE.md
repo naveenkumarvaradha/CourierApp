@@ -6,7 +6,7 @@
 
 | Software | Version | Purpose |
 |---|---|---|
-| **Java (JDK)** | 21 LTS | Run the Spring Boot backend JAR |
+| **Java (JDK)** | 25 LTS | Run the Spring Boot backend JAR |
 | **PostgreSQL** | 15 or 16 | Production database |
 | **Nginx** | Latest stable | Serve frontend + reverse proxy to backend |
 | **Node.js** | 20 LTS | Build the frontend (on build machine only) |
@@ -20,10 +20,10 @@
 ## 2. Install Software on Production Server (Ubuntu/Debian)
 
 ```bash
-# -- Java 21 --
+# -- Java 25 --
 sudo apt update
-sudo apt install -y openjdk-21-jdk
-java -version   # should print openjdk 21
+sudo apt install -y openjdk-25-jdk
+java -version   # should print openjdk 25
 
 # -- PostgreSQL 16 --
 sudo apt install -y postgresql postgresql-contrib
@@ -448,7 +448,7 @@ free -h
 
 ## 16. Summary — First-Time Setup Checklist
 
-- [ ] Install Java 21, PostgreSQL, Nginx on production server
+- [ ] Install Java 25, PostgreSQL, Nginx on production server
 - [ ] Create database and user
 - [ ] Create `/opt/shipdesk/` and `/var/www/shipdesk/` directories
 - [ ] Create `application-prod.yml` with production credentials

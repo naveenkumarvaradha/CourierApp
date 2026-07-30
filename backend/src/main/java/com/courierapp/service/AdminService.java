@@ -80,4 +80,11 @@ public interface AdminService {
     // Sticker field config
     List<StickerFieldDto> getStickerFieldConfig(Long companyId);
     List<StickerFieldDto> saveStickerFieldConfig(Long companyId, List<StickerFieldDto> fields);
+
+    // Units (company branches/addresses)
+    List<UnitResponse> listUnits();
+    List<UnitResponse> listActiveUnits();
+    UnitResponse createUnit(UnitRequest request);
+    UnitResponse updateUnit(Long id, UnitRequest request);
+    void deleteUnit(Long id);
 }
