@@ -8,7 +8,6 @@ import com.courierapp.enums.PartyStatus;
 import com.courierapp.exception.BusinessException;
 import com.courierapp.exception.ResourceNotFoundException;
 import com.courierapp.mapper.PartyMapper;
-import com.courierapp.repository.CompanyRepository;
 import com.courierapp.repository.PartyRepository;
 import com.courierapp.service.ApprovalAuthorizationService;
 import com.courierapp.kafka.CourierEventProducer;
@@ -38,20 +37,17 @@ public class PartyServiceImpl implements PartyService {
     private static final String MODULE = "MASTER";
 
     private final PartyRepository partyRepository;
-    private final CompanyRepository companyRepository;
     private final PartyMapper partyMapper;
     private final ApprovalAuthorizationService approvalAuthorizationService;
     private final AuditLogService auditLogService;
     private final CourierEventProducer eventProducer;
 
     public PartyServiceImpl(PartyRepository partyRepository,
-                            CompanyRepository companyRepository,
                             PartyMapper partyMapper,
                             ApprovalAuthorizationService approvalAuthorizationService,
                             AuditLogService auditLogService,
                             CourierEventProducer eventProducer) {
         this.partyRepository = partyRepository;
-        this.companyRepository = companyRepository;
         this.partyMapper = partyMapper;
         this.approvalAuthorizationService = approvalAuthorizationService;
         this.auditLogService = auditLogService;

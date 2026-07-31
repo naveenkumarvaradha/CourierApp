@@ -8,7 +8,6 @@ import com.courierapp.entity.FlexFieldOption;
 import com.courierapp.entity.FlexFieldValue;
 import com.courierapp.exception.BusinessException;
 import com.courierapp.exception.ResourceNotFoundException;
-import com.courierapp.service.AuditLogService;
 import com.courierapp.repository.FlexFieldOptionRepository;
 import com.courierapp.repository.FlexFieldRepository;
 import com.courierapp.repository.FlexFieldValueRepository;

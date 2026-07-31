@@ -71,7 +71,7 @@ public class DcPdfService {
                 logoCell.setBorder(Rectangle.NO_BORDER);
                 logoCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
                 try {
-                    Image logo = Image.getInstance(company.getLogoData());
+                    Image logo = Image.getInstance(java.util.Objects.requireNonNull(company).getLogoData());
                     logo.scaleToFit(60, 45);
                     logoCell.addElement(logo);
                 } catch (Exception ignored) {}

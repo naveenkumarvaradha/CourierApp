@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/dashboard")
@@ -110,7 +111,7 @@ public class DashboardController {
             if (isAdmin && companyId != null) {
                 // Admin exception: see all company parties pending approval
                 Specification<Party> adminPartySpec = (root, q, cb) -> {
-                    jakarta.persistence.criteria.Subquery<String> sub = q.subquery(String.class);
+                    jakarta.persistence.criteria.Subquery<String> sub = Objects.requireNonNull(q).subquery(String.class);
                     jakarta.persistence.criteria.Root<com.courierapp.entity.User> userRoot =
                             sub.from(com.courierapp.entity.User.class);
                     sub.select(userRoot.get("username"))
@@ -194,7 +195,7 @@ public class DashboardController {
                 predicates.add(cb.equal(root.get("status"), BookingStatus.APPROVED));
                 predicates.add(cb.equal(root.get("printTaken"), false));
                 if (canViewAllBookings && companyId != null) {
-                    jakarta.persistence.criteria.Subquery<String> sub = q.subquery(String.class);
+                    jakarta.persistence.criteria.Subquery<String> sub = Objects.requireNonNull(q).subquery(String.class);
                     jakarta.persistence.criteria.Root<com.courierapp.entity.User> userRoot =
                             sub.from(com.courierapp.entity.User.class);
                     sub.select(userRoot.get("username"))
@@ -217,7 +218,7 @@ public class DashboardController {
         List<BookingResponse> allPendingApprovalBookings = List.of();
         if (canViewBookings && companyId != null) {
             Specification<Booking> allPendingSpec = (root, q, cb) -> {
-                jakarta.persistence.criteria.Subquery<String> sub = q.subquery(String.class);
+                jakarta.persistence.criteria.Subquery<String> sub = Objects.requireNonNull(q).subquery(String.class);
                 jakarta.persistence.criteria.Root<com.courierapp.entity.User> userRoot =
                         sub.from(com.courierapp.entity.User.class);
                 sub.select(userRoot.get("username"))
@@ -251,7 +252,7 @@ public class DashboardController {
         List<PartyResponse> allPendingApprovalParties = List.of();
         if (canViewParties && companyId != null) {
             Specification<Party> allPartiesSpec = (root, q, cb) -> {
-                jakarta.persistence.criteria.Subquery<String> sub = q.subquery(String.class);
+                jakarta.persistence.criteria.Subquery<String> sub = Objects.requireNonNull(q).subquery(String.class);
                 jakarta.persistence.criteria.Root<com.courierapp.entity.User> userRoot =
                         sub.from(com.courierapp.entity.User.class);
                 sub.select(userRoot.get("username"))

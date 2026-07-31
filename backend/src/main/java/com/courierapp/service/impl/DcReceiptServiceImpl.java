@@ -99,7 +99,7 @@ public class DcReceiptServiceImpl implements DcReceiptService {
             Predicate typePred = cb.equal(root.get("dcType"), DcType.RETURNABLE);
             Predicate statusPred = root.get("status").in(List.of(DcStatus.ISSUED, DcStatus.DELIVERED));
 
-            Subquery<Long> sub = query.subquery(Long.class);
+            Subquery<Long> sub = java.util.Objects.requireNonNull(query).subquery(Long.class);
             Root<DcReceipt> receiptRoot = sub.from(DcReceipt.class);
             sub.select(receiptRoot.get("id"))
                     .where(cb.equal(receiptRoot.get("deliveryChallan").get("id"), root.get("id")));

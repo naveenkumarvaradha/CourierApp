@@ -10,7 +10,6 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 
@@ -82,7 +81,6 @@ public class JwtService {
         return accessExpiryMs / 1000L;
     }
 
-    @SuppressWarnings("unchecked")
     public List<String> extractAuthorities(Claims claims) {
         Object raw = claims.get("authorities");
         if (raw instanceof List<?> list) {

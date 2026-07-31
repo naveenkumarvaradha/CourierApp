@@ -7,7 +7,6 @@ import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.util.EnumMap;
 import java.util.Map;
 

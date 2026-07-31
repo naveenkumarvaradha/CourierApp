@@ -17,13 +17,13 @@ import com.lowagie.text.Rectangle;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
-import com.lowagie.text.pdf.draw.LineSeparator;
 import org.springframework.stereotype.Service;
 
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -104,7 +104,7 @@ public class StickerPdfService {
                 logoCell.setPadding(1);
                 logoCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
                 try {
-                    Image logo = Image.getInstance(company.getLogoData());
+                    Image logo = Image.getInstance(Objects.requireNonNull(company).getLogoData());
                     logo.scaleToFit(42, 32);
                     logoCell.addElement(logo);
                 } catch (Exception ignored) {}

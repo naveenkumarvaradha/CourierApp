@@ -3,8 +3,6 @@ package com.courierapp.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.util.Arrays;
-
 @Entity
 @Table(name = "company_settings")
 @Getter
