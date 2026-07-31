@@ -67,6 +67,7 @@ public class Party extends Auditable {
     private String companyName;
 
     @Column(name = "current_approval_level", nullable = false)
+    @Builder.Default
     private int currentApprovalLevel = 1;
 
     @ManyToOne(fetch = FetchType.LAZY)

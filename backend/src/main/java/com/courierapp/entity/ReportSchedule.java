@@ -54,6 +54,7 @@ public class ReportSchedule extends Auditable {
     private String fileFormat;
 
     @Column(name = "enabled", nullable = false)
+    @Builder.Default
     private boolean enabled = true;
 
     @Column(name = "last_run_at")

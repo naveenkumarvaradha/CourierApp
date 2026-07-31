@@ -16,5 +16,6 @@ public class Department extends Auditable {
     private String name;
 
     @Column(name = "active", nullable = false)
+    @Builder.Default
     private boolean active = true;
 }

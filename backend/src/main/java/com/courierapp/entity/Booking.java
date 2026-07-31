@@ -99,11 +99,13 @@ public class Booking extends Auditable {
     private String companyPoNo;
 
     @Column(name = "print_taken", nullable = false)
+    @Builder.Default
     private boolean printTaken = false;
 
     @Column(name = "cancellation_remarks", length = 500)
     private String cancellationRemarks;
 
     @Column(name = "current_approval_level", nullable = false)
+    @Builder.Default
     private int currentApprovalLevel = 1;
 }

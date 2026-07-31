@@ -88,6 +88,7 @@ public class DeliveryChallan extends Auditable {
     private String remarks;
 
     @Column(name = "current_approval_level", nullable = false)
+    @Builder.Default
     private int currentApprovalLevel = 1;
 
     @Column(name = "approver_username", length = 60)

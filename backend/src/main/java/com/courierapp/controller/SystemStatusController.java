@@ -23,7 +23,6 @@ import org.springframework.web.bind.annotation.*;
 import java.lang.management.*;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
-import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -192,9 +191,6 @@ public class SystemStatusController {
         result.put("localIpAddresses", resolveLocalIps());
 
         // ── Database info (host + name only — NO password) ────────────────────
-        String dsUrl = System.getProperty("spring.datasource.url",
-                System.getenv().getOrDefault("SPRING_DATASOURCE_URL",
-                        org.springframework.core.env.SystemEnvironmentPropertySource.class.getName()));
         String dbUrl = resolveDbUrl();
         result.put("dbUrl", maskPassword(dbUrl));
         result.put("dbUsername", resolveDbUsername());

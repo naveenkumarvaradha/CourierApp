@@ -644,7 +644,7 @@ public class ReportServiceImpl implements ReportService {
                 logoCell.setBorder(com.lowagie.text.Rectangle.NO_BORDER);
                 logoCell.setPadding(2);
                 try {
-                    Image logo = Image.getInstance(cs.getLogoData());
+                    Image logo = Image.getInstance(java.util.Objects.requireNonNull(cs).getLogoData());
                     logo.scaleToFit(60, 40);
                     logoCell.addElement(logo);
                 } catch (Exception ignored) {}
