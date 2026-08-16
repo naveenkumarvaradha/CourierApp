@@ -2,6 +2,7 @@ package com.courierapp.service;
 
 import com.courierapp.dto.dcreceipt.DcReceiptRequest;
 import com.courierapp.dto.dcreceipt.DcReceiptResponse;
+import com.courierapp.entity.Company;
 import com.courierapp.entity.DcReceipt;
 import com.courierapp.entity.DeliveryChallan;
 import com.courierapp.entity.Unit;
@@ -42,6 +43,7 @@ class DcReceiptServiceTest {
     @Mock DcReceiptMapper dcReceiptMapper;
     @Mock DcMapper dcMapper;
     @Mock AuditLogService auditLogService;
+    @Mock com.courierapp.security.CurrentUserService currentUserService;
 
     @InjectMocks
     DcReceiptServiceImpl dcReceiptService;
@@ -49,9 +51,13 @@ class DcReceiptServiceTest {
     private DeliveryChallan issuedReturnableDc;
     private DcReceiptResponse dummyResponse;
 
+    private static final Long COMPANY_ID = 1L;
+
     @BeforeEach
     void setUp() {
-        Unit unit = Unit.builder().id(1L).unitName("Coimbatore Factory").active(true).build();
+        lenient().when(currentUserService.requireCompanyId()).thenReturn(COMPANY_ID);
+        Company company = Company.builder().id(COMPANY_ID).companyCode("1").name("Test Co").build();
+        Unit unit = Unit.builder().id(1L).unitName("Coimbatore Factory").active(true).company(company).build();
         issuedReturnableDc = DeliveryChallan.builder()
                 .id(20L)
                 .dcNumber("C1-DC-2026-00001")

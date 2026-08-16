@@ -6,6 +6,7 @@ import com.courierapp.dto.dcreceipt.DcReceiptRequest;
 import com.courierapp.dto.dcreceipt.DcReceiptResponse;
 import com.courierapp.entity.DcReceipt;
 import com.courierapp.entity.DeliveryChallan;
+import com.courierapp.entity.Unit;
 import com.courierapp.enums.DcStatus;
 import com.courierapp.enums.DcType;
 import com.courierapp.exception.BusinessException;
@@ -48,6 +49,7 @@ public class DcReceiptServiceImpl implements DcReceiptService {
     private final DcReceiptMapper dcReceiptMapper;
     private final DcMapper dcMapper;
     private final AuditLogService auditLogService;
+    private final com.courierapp.security.CurrentUserService currentUserService;
 
     public DcReceiptServiceImpl(DcReceiptRepository dcReceiptRepository,
                                 DeliveryChallanRepository deliveryChallanRepository,
@@ -55,7 +57,8 @@ public class DcReceiptServiceImpl implements DcReceiptService {
                                 DcReceiptNumberGenerator dcReceiptNumberGenerator,
                                 DcReceiptMapper dcReceiptMapper,
                                 DcMapper dcMapper,
-                                AuditLogService auditLogService) {
+                                AuditLogService auditLogService,
+                                com.courierapp.security.CurrentUserService currentUserService) {
         this.dcReceiptRepository = dcReceiptRepository;
         this.deliveryChallanRepository = deliveryChallanRepository;
         this.companySettingsRepository = companySettingsRepository;
@@ -63,14 +66,18 @@ public class DcReceiptServiceImpl implements DcReceiptService {
         this.dcReceiptMapper = dcReceiptMapper;
         this.dcMapper = dcMapper;
         this.auditLogService = auditLogService;
+        this.currentUserService = currentUserService;
     }
 
     @Override
     @Transactional(readOnly = true)
     public PageResponse<DcReceiptResponse> search(String receiptNumber, LocalDate fromDate, LocalDate toDate,
                                                   Pageable pageable) {
+        Long callerCompanyId = currentUserService.requireCompanyId();
         Specification<DcReceipt> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.equal(
+                    root.get("deliveryChallan").get("unit").get("company").get("id"), callerCompanyId));
             if (StringUtils.hasText(receiptNumber)) {
                 predicates.add(cb.like(cb.lower(root.get("receiptNumber")), "%" + receiptNumber.toLowerCase() + "%"));
             }
@@ -95,9 +102,11 @@ public class DcReceiptServiceImpl implements DcReceiptService {
     @Override
     @Transactional(readOnly = true)
     public PageResponse<DcResponse> listEligibleDcs(Pageable pageable) {
+        Long callerCompanyId = currentUserService.requireCompanyId();
         Specification<DeliveryChallan> spec = (root, query, cb) -> {
             Predicate typePred = cb.equal(root.get("dcType"), DcType.RETURNABLE);
             Predicate statusPred = root.get("status").in(List.of(DcStatus.ISSUED, DcStatus.DELIVERED));
+            Predicate companyPred = cb.equal(root.get("unit").get("company").get("id"), callerCompanyId);
 
             Subquery<Long> sub = java.util.Objects.requireNonNull(query).subquery(Long.class);
             Root<DcReceipt> receiptRoot = sub.from(DcReceipt.class);
@@ -105,7 +114,7 @@ public class DcReceiptServiceImpl implements DcReceiptService {
                     .where(cb.equal(receiptRoot.get("deliveryChallan").get("id"), root.get("id")));
             Predicate noReceiptPred = cb.not(cb.exists(sub));
 
-            return cb.and(typePred, statusPred, noReceiptPred);
+            return cb.and(typePred, statusPred, companyPred, noReceiptPred);
         };
         Page<DeliveryChallan> page = deliveryChallanRepository.findAll(spec, pageable);
         return PageResponse.from(page, dcMapper::toResponse);
@@ -113,8 +122,13 @@ public class DcReceiptServiceImpl implements DcReceiptService {
 
     @Override
     public DcReceiptResponse create(DcReceiptRequest request) {
+        Long callerCompanyId = currentUserService.requireCompanyId();
         DeliveryChallan dc = deliveryChallanRepository.findById(request.dcId())
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery challan", request.dcId()));
+        Long dcCompanyId = dc.getUnit().getCompany() != null ? dc.getUnit().getCompany().getId() : null;
+        if (dcCompanyId == null || !dcCompanyId.equals(callerCompanyId)) {
+            throw new ResourceNotFoundException("Delivery challan", request.dcId());
+        }
         if (dc.getDcType() != DcType.RETURNABLE) {
             throw new BusinessException("Only Returnable DCs can have a receipt confirmed");
         }
@@ -162,12 +176,20 @@ public class DcReceiptServiceImpl implements DcReceiptService {
     }
 
     private DcReceipt findReceipt(Long id) {
-        return dcReceiptRepository.findById(id)
+        DcReceipt receipt = dcReceiptRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("DC receipt", id));
+        Long callerCompanyId = currentUserService.requireCompanyId();
+        Unit dcUnit = receipt.getDeliveryChallan().getUnit();
+        Long ownerCompanyId = dcUnit.getCompany() != null ? dcUnit.getCompany().getId() : null;
+        if (ownerCompanyId == null || !ownerCompanyId.equals(callerCompanyId)) {
+            throw new ResourceNotFoundException("DC receipt", id);
+        }
+        return receipt;
     }
 
     private String resolveCompanyCode() {
-        return companySettingsRepository.findAll().stream().findFirst()
+        Long companyId = currentUserService.requireCompanyId();
+        return companySettingsRepository.findByCompanyId(companyId)
                 .map(s -> s.getCompany() != null ? s.getCompany().getCompanyCode() : null)
                 .orElse(null);
     }

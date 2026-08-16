@@ -75,6 +75,7 @@ public class BookingServiceImpl implements BookingService {
     private final com.courierapp.repository.StickerFieldConfigRepository stickerFieldConfigRepository;
     private final com.courierapp.kafka.CourierEventProducer eventProducer;
     private final UnitRepository unitRepository;
+    private final com.courierapp.security.CurrentUserService currentUserService;
 
     public BookingServiceImpl(BookingRepository bookingRepository,
                               PartyRepository partyRepository,
@@ -89,7 +90,8 @@ public class BookingServiceImpl implements BookingService {
                               AuditLogService auditLogService,
                               com.courierapp.repository.StickerFieldConfigRepository stickerFieldConfigRepository,
                               com.courierapp.kafka.CourierEventProducer eventProducer,
-                              UnitRepository unitRepository) {
+                              UnitRepository unitRepository,
+                              com.courierapp.security.CurrentUserService currentUserService) {
         this.bookingRepository = bookingRepository;
         this.partyRepository = partyRepository;
         this.companySettingsRepository = companySettingsRepository;
@@ -104,6 +106,7 @@ public class BookingServiceImpl implements BookingService {
         this.stickerFieldConfigRepository = stickerFieldConfigRepository;
         this.unitRepository = unitRepository;
         this.eventProducer = eventProducer;
+        this.currentUserService = currentUserService;
     }
 
     @Override
@@ -407,13 +410,29 @@ public class BookingServiceImpl implements BookingService {
     }
 
     private Booking findBooking(Long id) {
-        return bookingRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Booking", id));
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking", id));
+        Long callerCompanyId = currentUserService.requireCompanyId();
+        Long ownerCompanyId = booking.getSender().getCompany() != null
+                ? booking.getSender().getCompany().getId() : null;
+        if (ownerCompanyId == null || !ownerCompanyId.equals(callerCompanyId)) {
+            // 404, not 403 — don't confirm to a caller from another company that this id exists.
+            throw new ResourceNotFoundException("Booking", id);
+        }
+        return booking;
     }
 
     private void apply(Booking booking, BookingRequest r, LocalDate bookingDate) {
+        Long callerCompanyId = currentUserService.requireCompanyId();
         Party sender = resolveCompanySender();
         Party receiver = partyRepository.findById(r.receiverId())
                 .orElseThrow(() -> new ResourceNotFoundException("Receiver party", r.receiverId()));
+        // A party with no company is a shared/global address-book entry; one with a company
+        // must be the caller's own — otherwise this would let a booking pull in another
+        // company's private address-book record just by guessing its id.
+        if (receiver.getCompany() != null && !receiver.getCompany().getId().equals(callerCompanyId)) {
+            throw new ResourceNotFoundException("Receiver party", r.receiverId());
+        }
         CourierWay courierWay = courierWayRepository.findById(r.courierWayId())
                 .orElseThrow(() -> new ResourceNotFoundException("Courier way", r.courierWayId()));
         if (!courierWay.isActive()) {
@@ -428,6 +447,9 @@ public class BookingServiceImpl implements BookingService {
         if (r.unitId() != null) {
             unit = unitRepository.findById(r.unitId())
                     .orElseThrow(() -> new ResourceNotFoundException("Unit", r.unitId()));
+            if (unit.getCompany() == null || !unit.getCompany().getId().equals(callerCompanyId)) {
+                throw new ResourceNotFoundException("Unit", r.unitId());
+            }
         }
         booking.setBookingDate(bookingDate);
         booking.setSender(sender);
@@ -444,7 +466,8 @@ public class BookingServiceImpl implements BookingService {
     }
 
     private Party resolveCompanySender() {
-        CompanySettings settings = companySettingsRepository.findAll().stream().findFirst()
+        Long companyId = currentUserService.requireCompanyId();
+        CompanySettings settings = companySettingsRepository.findByCompanyId(companyId)
                 .orElseThrow(() -> new BusinessException("Company settings not configured. Please set up company details in Admin → Company Setup."));
         if (settings.getLinkedParty() == null) {
             throw new BusinessException("Company party not linked. Please save Company Setup to generate the sender party.");
@@ -453,7 +476,8 @@ public class BookingServiceImpl implements BookingService {
     }
 
     private String resolveCompanyCode() {
-        return companySettingsRepository.findAll().stream().findFirst()
+        Long companyId = currentUserService.requireCompanyId();
+        return companySettingsRepository.findByCompanyId(companyId)
                 .map(s -> s.getCompany() != null ? s.getCompany().getCompanyCode() : null)
                 .orElse(null);
     }
@@ -461,8 +485,10 @@ public class BookingServiceImpl implements BookingService {
     private Specification<Booking> buildSpec(String bookingNumber, LocalDate fromDate, LocalDate toDate,
                                              BookingStatus status, Long senderId, Long receiverId,
                                              CourierMode mode, String receiverName, String receiverCompanyName) {
+        Long callerCompanyId = currentUserService.requireCompanyId();
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.equal(root.get("sender").get("company").get("id"), callerCompanyId));
             if (StringUtils.hasText(bookingNumber)) {
                 predicates.add(cb.like(cb.lower(root.get("bookingNumber")),
                         "%" + bookingNumber.toLowerCase() + "%"));

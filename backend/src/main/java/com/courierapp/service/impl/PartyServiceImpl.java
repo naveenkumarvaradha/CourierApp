@@ -41,17 +41,23 @@ public class PartyServiceImpl implements PartyService {
     private final ApprovalAuthorizationService approvalAuthorizationService;
     private final AuditLogService auditLogService;
     private final CourierEventProducer eventProducer;
+    private final com.courierapp.security.CurrentUserService currentUserService;
+    private final com.courierapp.repository.CompanyRepository companyRepository;
 
     public PartyServiceImpl(PartyRepository partyRepository,
                             PartyMapper partyMapper,
                             ApprovalAuthorizationService approvalAuthorizationService,
                             AuditLogService auditLogService,
-                            CourierEventProducer eventProducer) {
+                            CourierEventProducer eventProducer,
+                            com.courierapp.security.CurrentUserService currentUserService,
+                            com.courierapp.repository.CompanyRepository companyRepository) {
         this.partyRepository = partyRepository;
         this.partyMapper = partyMapper;
         this.approvalAuthorizationService = approvalAuthorizationService;
         this.auditLogService = auditLogService;
         this.eventProducer = eventProducer;
+        this.currentUserService = currentUserService;
+        this.companyRepository = companyRepository;
     }
 
     @Override
@@ -81,9 +87,11 @@ public class PartyServiceImpl implements PartyService {
     @Override
     @Transactional(readOnly = true)
     public List<PartyResponse> listAllActive() {
+        Long callerCompanyId = currentUserService.requireCompanyId();
         Specification<Party> spec = (root, q, cb) -> cb.and(
                 cb.equal(root.get("partyStatus"), PartyStatus.ACTIVE),
-                cb.notLike(root.get("partyCode"), "COMPANY%")
+                cb.notLike(root.get("partyCode"), "COMPANY%"),
+                cb.or(cb.isNull(root.get("company")), cb.equal(root.get("company").get("id"), callerCompanyId))
         );
         List<Party> parties = partyRepository.findAll(spec, Sort.by("partyName"));
         log.debug("Returning {} active parties for dropdown (company party excluded)", parties.size());
@@ -102,6 +110,7 @@ public class PartyServiceImpl implements PartyService {
         log.info("Creating party: name={}, type={}", request.partyName(), request.partyType());
         Party party = new Party();
         apply(party, request);
+        party.setCompany(companyRepository.findById(currentUserService.requireCompanyId()).orElse(null));
         party.setPartyCode(generatePartyCode());
         party.setPartyStatus(PartyStatus.PENDING_APPROVAL);
         party.setActive(false);
@@ -207,7 +216,15 @@ public class PartyServiceImpl implements PartyService {
     }
 
     private Party findParty(Long id) {
-        return partyRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Party", id));
+        Party party = partyRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Party", id));
+        // A party with no company is a shared/global address-book entry (or predates
+        // per-company scoping); one with a company must belong to the caller's own.
+        if (party.getCompany() != null
+                && !party.getCompany().getId().equals(currentUserService.requireCompanyId())) {
+            throw new ResourceNotFoundException("Party", id);
+        }
+        return party;
     }
 
     private void apply(Party party, PartyRequest r) {
@@ -242,10 +259,12 @@ public class PartyServiceImpl implements PartyService {
     }
 
     private Specification<Party> buildSpec(String name, String city, String pincode, Boolean active) {
+        Long callerCompanyId = currentUserService.requireCompanyId();
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             // Exclude internal company parties; they are managed via Company Setup
             predicates.add(cb.notLike(root.get("partyCode"), "COMPANY%"));
+            predicates.add(cb.or(cb.isNull(root.get("company")), cb.equal(root.get("company").get("id"), callerCompanyId)));
             if (StringUtils.hasText(name)) {
                 predicates.add(cb.like(cb.lower(root.get("partyName")),
                         "%" + name.toLowerCase(Locale.ROOT) + "%"));

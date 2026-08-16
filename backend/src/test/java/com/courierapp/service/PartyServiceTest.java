@@ -1,6 +1,7 @@
 package com.courierapp.service;
 
 import com.courierapp.dto.master.PartyResponse;
+import com.courierapp.entity.Company;
 import com.courierapp.entity.Party;
 import com.courierapp.enums.PartyStatus;
 import com.courierapp.enums.PartyType;
@@ -36,6 +37,7 @@ class PartyServiceTest {
     @Mock ApprovalAuthorizationService approvalAuthorizationService;
     @Mock AuditLogService auditLogService;
     @Mock com.courierapp.kafka.CourierEventProducer eventProducer;
+    @Mock com.courierapp.security.CurrentUserService currentUserService;
 
     @InjectMocks
     PartyServiceImpl partyService;
@@ -43,8 +45,12 @@ class PartyServiceTest {
     private Party pendingParty;
     private PartyResponse dummyResponse;
 
+    private static final Long COMPANY_ID = 1L;
+
     @BeforeEach
     void setUp() {
+        lenient().when(currentUserService.requireCompanyId()).thenReturn(COMPANY_ID);
+        Company company = Company.builder().id(COMPANY_ID).companyCode("1").name("Test Co").build();
         pendingParty = Party.builder()
                 .id(5L)
                 .partyCode("PTY000005")
@@ -58,6 +64,7 @@ class PartyServiceTest {
                 .partyStatus(PartyStatus.PENDING_APPROVAL)
                 .active(false)
                 .currentApprovalLevel(1)
+                .company(company)
                 .build();
         pendingParty.setCreatedBy("priya");
         pendingParty.setCreatedAt(Instant.now());

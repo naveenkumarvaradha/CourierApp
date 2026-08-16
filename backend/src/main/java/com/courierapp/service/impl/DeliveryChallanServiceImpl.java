@@ -72,6 +72,7 @@ public class DeliveryChallanServiceImpl implements DeliveryChallanService {
     private final DcPdfService dcPdfService;
     private final AuditLogService auditLogService;
     private final ApprovalAuthorizationService approvalAuthorizationService;
+    private final com.courierapp.security.CurrentUserService currentUserService;
 
     public DeliveryChallanServiceImpl(DeliveryChallanRepository deliveryChallanRepository,
                                       UnitRepository unitRepository,
@@ -83,7 +84,8 @@ public class DeliveryChallanServiceImpl implements DeliveryChallanService {
                                       DcMapper dcMapper,
                                       DcPdfService dcPdfService,
                                       AuditLogService auditLogService,
-                                      ApprovalAuthorizationService approvalAuthorizationService) {
+                                      ApprovalAuthorizationService approvalAuthorizationService,
+                                      com.courierapp.security.CurrentUserService currentUserService) {
         this.deliveryChallanRepository = deliveryChallanRepository;
         this.unitRepository = unitRepository;
         this.partyRepository = partyRepository;
@@ -95,6 +97,7 @@ public class DeliveryChallanServiceImpl implements DeliveryChallanService {
         this.dcPdfService = dcPdfService;
         this.auditLogService = auditLogService;
         this.approvalAuthorizationService = approvalAuthorizationService;
+        this.currentUserService = currentUserService;
     }
 
     @Override
@@ -251,8 +254,12 @@ public class DeliveryChallanServiceImpl implements DeliveryChallanService {
     }
 
     private void applyFields(DeliveryChallan dc, DcRequest request) {
+        Long callerCompanyId = currentUserService.requireCompanyId();
         Unit unit = unitRepository.findById(request.unitId())
                 .orElseThrow(() -> new ResourceNotFoundException("Unit", request.unitId()));
+        if (unit.getCompany() == null || !unit.getCompany().getId().equals(callerCompanyId)) {
+            throw new ResourceNotFoundException("Unit", request.unitId());
+        }
 
         Party receiverParty = null;
         Unit receiverUnit = null;
@@ -262,6 +269,9 @@ public class DeliveryChallanServiceImpl implements DeliveryChallanService {
             }
             receiverParty = partyRepository.findById(request.receiverPartyId())
                     .orElseThrow(() -> new ResourceNotFoundException("Receiver party", request.receiverPartyId()));
+            if (receiverParty.getCompany() != null && !receiverParty.getCompany().getId().equals(callerCompanyId)) {
+                throw new ResourceNotFoundException("Receiver party", request.receiverPartyId());
+            }
         } else {
             if (request.receiverUnitId() == null) {
                 throw new BusinessException("Receiver unit is required when receiver type is UNIT");
@@ -271,6 +281,9 @@ public class DeliveryChallanServiceImpl implements DeliveryChallanService {
             }
             receiverUnit = unitRepository.findById(request.receiverUnitId())
                     .orElseThrow(() -> new ResourceNotFoundException("Receiver unit", request.receiverUnitId()));
+            if (receiverUnit.getCompany() == null || !receiverUnit.getCompany().getId().equals(callerCompanyId)) {
+                throw new ResourceNotFoundException("Receiver unit", request.receiverUnitId());
+            }
         }
 
         CourierWay courierWay = courierWayRepository.findById(request.courierWayId())
@@ -301,12 +314,19 @@ public class DeliveryChallanServiceImpl implements DeliveryChallanService {
     }
 
     private DeliveryChallan findDc(Long id) {
-        return deliveryChallanRepository.findById(id)
+        DeliveryChallan dc = deliveryChallanRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery challan", id));
+        Long callerCompanyId = currentUserService.requireCompanyId();
+        Long ownerCompanyId = dc.getUnit().getCompany() != null ? dc.getUnit().getCompany().getId() : null;
+        if (ownerCompanyId == null || !ownerCompanyId.equals(callerCompanyId)) {
+            throw new ResourceNotFoundException("Delivery challan", id);
+        }
+        return dc;
     }
 
     private String resolveCompanyCode() {
-        return companySettingsRepository.findAll().stream().findFirst()
+        Long companyId = currentUserService.requireCompanyId();
+        return companySettingsRepository.findByCompanyId(companyId)
                 .map(s -> s.getCompany() != null ? s.getCompany().getCompanyCode() : null)
                 .orElse(null);
     }
@@ -318,8 +338,10 @@ public class DeliveryChallanServiceImpl implements DeliveryChallanService {
 
     private Specification<DeliveryChallan> buildSpec(String dcNumber, LocalDate fromDate, LocalDate toDate,
                                                       DcStatus status) {
+        Long callerCompanyId = currentUserService.requireCompanyId();
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.equal(root.get("unit").get("company").get("id"), callerCompanyId));
             if (StringUtils.hasText(dcNumber)) {
                 predicates.add(cb.like(cb.lower(root.get("dcNumber")), "%" + dcNumber.toLowerCase() + "%"));
             }

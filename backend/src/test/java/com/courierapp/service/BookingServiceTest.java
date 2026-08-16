@@ -4,6 +4,7 @@ import com.courierapp.dto.booking.ApprovalDecisionRequest;
 import com.courierapp.dto.booking.BookingResponse;
 import com.courierapp.dto.booking.StatusUpdateRequest;
 import com.courierapp.entity.Booking;
+import com.courierapp.entity.Company;
 import com.courierapp.entity.Party;
 import com.courierapp.enums.BookingStatus;
 import com.courierapp.enums.CourierMode;
@@ -47,6 +48,7 @@ class BookingServiceTest {
     @Mock AuditLogService auditLogService;
     @Mock com.courierapp.repository.StickerFieldConfigRepository stickerFieldConfigRepository;
     @Mock com.courierapp.kafka.CourierEventProducer eventProducer;
+    @Mock com.courierapp.security.CurrentUserService currentUserService;
 
     @InjectMocks
     BookingServiceImpl bookingService;
@@ -54,10 +56,14 @@ class BookingServiceTest {
     private Booking pendingBooking;
     private BookingResponse dummyResponse;
 
+    private static final Long COMPANY_ID = 1L;
+
     @BeforeEach
     void setUp() {
+        lenient().when(currentUserService.requireCompanyId()).thenReturn(COMPANY_ID);
+        Company company = Company.builder().id(COMPANY_ID).companyCode("1").name("Test Co").build();
         Party sender = Party.builder().id(1L).partyCode("PTY001").partyName("Sender Co")
-                .partyType(PartyType.SENDER).active(true).city("Chennai").build();
+                .partyType(PartyType.SENDER).active(true).city("Chennai").company(company).build();
         Party receiver = Party.builder().id(2L).partyCode("PTY002").partyName("Receiver Co")
                 .partyType(PartyType.RECEIVER).active(true).city("Mumbai").build();
 

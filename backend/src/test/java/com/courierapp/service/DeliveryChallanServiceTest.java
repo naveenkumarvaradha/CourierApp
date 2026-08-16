@@ -3,6 +3,7 @@ package com.courierapp.service;
 import com.courierapp.dto.booking.ApprovalDecisionRequest;
 import com.courierapp.dto.dc.DcRequest;
 import com.courierapp.dto.dc.DcResponse;
+import com.courierapp.entity.Company;
 import com.courierapp.entity.CourierWay;
 import com.courierapp.entity.DeliveryChallan;
 import com.courierapp.entity.Party;
@@ -48,6 +49,7 @@ class DeliveryChallanServiceTest {
     @Mock DcPdfService dcPdfService;
     @Mock AuditLogService auditLogService;
     @Mock ApprovalAuthorizationService approvalAuthorizationService;
+    @Mock com.courierapp.security.CurrentUserService currentUserService;
 
     @InjectMocks
     DeliveryChallanServiceImpl deliveryChallanService;
@@ -59,10 +61,14 @@ class DeliveryChallanServiceTest {
     private DeliveryChallan pendingDc;
     private DcResponse dummyResponse;
 
+    private static final Long COMPANY_ID = 1L;
+
     @BeforeEach
     void setUp() {
-        senderUnit = Unit.builder().id(1L).unitName("Coimbatore Factory").active(true).build();
-        otherUnit = Unit.builder().id(2L).unitName("Warehouse").active(true).build();
+        lenient().when(currentUserService.requireCompanyId()).thenReturn(COMPANY_ID);
+        Company company = Company.builder().id(COMPANY_ID).companyCode("1").name("Test Co").build();
+        senderUnit = Unit.builder().id(1L).unitName("Coimbatore Factory").active(true).company(company).build();
+        otherUnit = Unit.builder().id(2L).unitName("Warehouse").active(true).company(company).build();
         receiverParty = Party.builder().id(5L).partyCode("PTY000005").partyName("Avery")
                 .partyType(PartyType.RECEIVER).active(true).build();
         activeWay = CourierWay.builder().id(3L).name("DHL").active(true).build();
