@@ -614,6 +614,7 @@ public class AdminServiceImpl implements AdminService {
         party.setPartyType(PartyType.SENDER);
         party.setActive(true);
         party.setPartyStatus(PartyStatus.ACTIVE);
+        party.setCompany(company);
         Party savedParty = partyRepository.save(party);
         s.setLinkedParty(savedParty);
         CompanySettings saved = companySettingsRepository.save(s);
