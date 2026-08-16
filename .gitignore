@@ -17,7 +17,3 @@ frontend/tsconfig.tsbuildinfo
 .env
 *.env.local
 backend/application.properties
-
-# Local WinSW service binaries (machine-specific, config is tracked)
-k8s-portforward/*.exe
-k8s-portforward/logs/

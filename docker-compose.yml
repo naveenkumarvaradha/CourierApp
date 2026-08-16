@@ -85,9 +85,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # The browser connects to backend directly — use the host machine's IP or domain
-        # Replace 192.168.2.245 with your server's IP or domain name
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://192.168.2.245:8080/api}
+        # The browser connects to the backend directly on localhost
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080/api}
     container_name: shipdesk-frontend
     restart: unless-stopped
     ports:
