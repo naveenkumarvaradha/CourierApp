@@ -162,7 +162,7 @@ cd backend
 
 export DB_USERNAME=courier_app
 export DB_PASSWORD=Courier@123
-export JWT_SECRET=replace-with-a-long-random-string-32-chars-min
+export JWT_SECRET=replace-with-a-long-random-string-at-least-64-characters-long
 export REDIS_HOST=localhost
 export REDIS_PORT=6379
 export CORS_ORIGINS=http://localhost:5173
@@ -204,7 +204,7 @@ Change this password after first login.
 |---|---|---|
 | `DB_USERNAME` | PostgreSQL username | `courier_app` |
 | `DB_PASSWORD` | PostgreSQL password | `Courier@123` |
-| `JWT_SECRET` | JWT signing key (min 32 chars) | insecure default |
+| `JWT_SECRET` | JWT signing key — **min 64 chars** (HS512 requires a key ≥ 512 bits; shorter keys throw `WeakKeyException` at login) | insecure default |
 | `REDIS_HOST` | Redis host | `localhost` |
 | `REDIS_PORT` | Redis port | `6379` |
 | `REDIS_PASSWORD` | Redis password | `` (blank) |
@@ -224,7 +224,7 @@ Change this password after first login.
 
 ```bash
 cp .env.example .env
-# edit .env — set a real APP_JWT_SECRET
+# edit .env — set a real JWT_SECRET (>= 64 characters)
 
 docker compose up --build
 # Frontend: http://localhost:8090

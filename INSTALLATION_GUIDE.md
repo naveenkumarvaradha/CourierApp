@@ -137,7 +137,7 @@ psql -U postgres
 cd D:\Application\CourierApp\backend
 $env:DB_USERNAME = "courier_app"
 $env:DB_PASSWORD = "Courier@123"
-$env:JWT_SECRET = "replace-with-a-long-random-string-32-chars-min"
+$env:JWT_SECRET = "replace-with-a-long-random-string-at-least-64-characters-long"
 $env:REDIS_HOST = "localhost"
 $env:REDIS_PORT = "6379"
 $env:CORS_ORIGINS = "http://localhost:5173"
