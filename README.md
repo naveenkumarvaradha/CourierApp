@@ -83,9 +83,10 @@ CourierApp/
 │   │   ├── types/                      # TypeScript interfaces
 │   │   └── App.tsx                     # Route definitions
 │   └── dist/                           # Build output (npm run build)
-├── docker-compose.yml                  # Optional: run everything locally in containers
 ├── README.md                           # This file
-└── INSTALLATION_GUIDE.md               # Fresh install guide
+└── docs/
+    ├── INSTALLATION_GUIDE.md           # Fresh install guide
+    └── DEV_ENVIRONMENT.md              # Installed toolchain & config reference
 ```
 
 ---
@@ -136,7 +137,7 @@ POST /api/auth/logout   → token blacklisted in Redis
 
 ## Local Development
 
-See [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md) for full toolchain setup.
+See [docs/INSTALLATION_GUIDE.md](docs/INSTALLATION_GUIDE.md) for full toolchain setup, and [docs/DEV_ENVIRONMENT.md](docs/DEV_ENVIRONMENT.md) for what's installed on this machine specifically.
 
 ### Prerequisites
 - JDK 25+
@@ -215,21 +216,6 @@ Change this password after first login.
 | `MAIL_PORT` | SMTP port | `587` |
 | `MAIL_USERNAME` | SMTP username | — |
 | `MAIL_PASSWORD` | SMTP password | — |
-
----
-
-## Optional: Run everything in Docker locally
-
-`docker-compose.yml` builds and runs Postgres, Redis, backend, and frontend as containers, all on `localhost`:
-
-```bash
-cp .env.example .env
-# edit .env — set a real JWT_SECRET (>= 64 characters)
-
-docker compose up --build
-# Frontend: http://localhost:8090
-# Backend:  http://localhost:8080/api
-```
 
 ---
 
