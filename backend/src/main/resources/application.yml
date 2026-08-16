@@ -104,7 +104,7 @@ spring:
   mail:
     host: ${MAIL_HOST:smtp.office365.com}
     port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:naveenkumarv@ctl-india.com}
+    username: ${MAIL_USERNAME:}
     password: "${MAIL_PASSWORD:}"
     properties:
       mail:

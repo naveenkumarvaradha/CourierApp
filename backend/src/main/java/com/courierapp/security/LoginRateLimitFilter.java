@@ -90,10 +90,11 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
     }
 
     private String resolveIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
-        }
+        // Deliberately NOT trusting X-Forwarded-For here: it's a client-supplied header, so an
+        // attacker can set it to a random value on every request to get a fresh rate-limit
+        // bucket and bypass this filter entirely. If this app is ever deployed behind a real
+        // reverse proxy, configure Tomcat's RemoteIpValve with a trusted-proxy allowlist so
+        // getRemoteAddr() itself resolves correctly — don't re-trust the header in app code.
         return request.getRemoteAddr();
     }
 }

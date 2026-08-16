@@ -149,6 +149,10 @@ public class AuthServiceImpl implements AuthService {
         Long companyId = user.getCompany() != null ? user.getCompany().getId() : null;
         String access = jwtService.generateAccessToken(username, user.getId(), companyId, authorities);
         String newRefresh = jwtService.generateRefreshToken(username, user.getId());
+        // Rotate: the old refresh token must not be usable again — blacklisting it lets us
+        // detect replay of a stolen/rotated-away token instead of leaving it valid until its
+        // natural 7-day expiry.
+        tokenBlacklistService.blacklist(claims.getId(), claims.getExpiration());
         return TokenResponse.bearer(access, newRefresh, jwtService.getAccessExpirySeconds());
     }
 
