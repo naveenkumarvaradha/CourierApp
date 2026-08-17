@@ -50,41 +50,26 @@ export default function LoginPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(145deg, #0f172a 0%, #1e3a8a 45%, #312e81 100%)',
+        bgcolor: '#f5f5f7',
         p: { xs: 2, sm: 3 },
-        position: 'relative',
-        overflow: 'hidden',
       }}
     >
-      {/* Decorative blobs */}
-      <Box sx={{
-        position: 'absolute', top: '-20%', right: '-10%', width: 500, height: 500,
-        borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.3) 0%, transparent 70%)',
-        pointerEvents: 'none',
-      }} />
-      <Box sx={{
-        position: 'absolute', bottom: '-15%', left: '-8%', width: 400, height: 400,
-        borderRadius: '50%', background: 'radial-gradient(circle, rgba(59,130,246,0.25) 0%, transparent 70%)',
-        pointerEvents: 'none',
-      }} />
-
-      {/* Card */}
+      {/* Card — the color change from parchment to white canvas is the only
+          separation needed; no shadow, per the single-accent flat design language. */}
       <Paper
         elevation={0}
         sx={{
           width: '100%',
           maxWidth: 440,
-          borderRadius: 4,
+          borderRadius: '18px',
           overflow: 'hidden',
-          boxShadow: '0 32px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08)',
-          position: 'relative',
-          zIndex: 1,
+          border: '1px solid',
+          borderColor: 'divider',
         }}
       >
         {/* Brand header */}
         <Box
           sx={{
-            background: 'linear-gradient(135deg, #1d4ed8 0%, #4f46e5 100%)',
             px: { xs: 4, sm: 5 },
             pt: { xs: 5, sm: 6 },
             pb: { xs: 4, sm: 5 },
@@ -96,24 +81,21 @@ export default function LoginPage() {
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: 72,
-              height: 72,
-              borderRadius: '22px',
-              background: 'rgba(255,255,255,0.15)',
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255,255,255,0.2)',
+              width: 64,
+              height: 64,
+              borderRadius: '18px',
+              bgcolor: 'primary.main',
               mb: 2.5,
-              boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
             }}
           >
-            <LocalShippingIcon sx={{ fontSize: 36, color: 'white' }} />
+            <LocalShippingIcon sx={{ fontSize: 32, color: 'white' }} />
           </Box>
           <Typography
             variant="h4"
             sx={{
-              color: 'white',
-              fontWeight: 800,
-              letterSpacing: '-0.5px',
+              color: 'text.primary',
+              fontWeight: 600,
+              letterSpacing: '-0.02em',
               lineHeight: 1,
               mb: 0.75,
             }}
@@ -124,7 +106,7 @@ export default function LoginPage() {
 
         {/* Form section */}
         <Box sx={{ px: { xs: 3, sm: 5 }, py: { xs: 4, sm: 5 }, bgcolor: 'background.paper' }}>
-          <Typography variant="subtitle1" fontWeight={700} color="text.primary" sx={{ mb: 3 }}>
+          <Typography variant="subtitle1" fontWeight={600} color="text.primary" sx={{ mb: 3 }}>
             Sign in to your account
           </Typography>
 
@@ -148,7 +130,6 @@ export default function LoginPage() {
                 required
                 disabled={companies.length === 0}
                 size="small"
-                sx={fieldSx}
                 SelectProps={{ MenuProps: { transitionDuration: 0 } }}
               >
                 {companies.map((c) => (
@@ -164,7 +145,6 @@ export default function LoginPage() {
                 required
                 autoComplete="username"
                 size="small"
-                sx={fieldSx}
               />
 
               <TextField
@@ -176,7 +156,6 @@ export default function LoginPage() {
                 required
                 autoComplete="current-password"
                 size="small"
-                sx={fieldSx}
               />
 
               <Button
@@ -185,24 +164,7 @@ export default function LoginPage() {
                 size="large"
                 disabled={loading}
                 fullWidth
-                sx={{
-                  mt: 0.5,
-                  py: 1.4,
-                  fontWeight: 700,
-                  fontSize: '0.95rem',
-                  borderRadius: 2.5,
-                  background: 'linear-gradient(135deg, #1d4ed8 0%, #4f46e5 100%)',
-                  boxShadow: '0 4px 15px rgba(79,70,229,0.4)',
-                  textTransform: 'none',
-                  letterSpacing: 0.2,
-                  '&:hover': {
-                    background: 'linear-gradient(135deg, #1e40af 0%, #4338ca 100%)',
-                    boxShadow: '0 6px 20px rgba(79,70,229,0.5)',
-                    transform: 'translateY(-1px)',
-                  },
-                  '&:active': { transform: 'translateY(0)' },
-                  transition: 'all 0.2s ease',
-                }}
+                sx={{ mt: 0.5, py: 1.4, fontSize: '1rem' }}
               >
                 {loading
                   ? <CircularProgress size={20} color="inherit" />
@@ -215,7 +177,7 @@ export default function LoginPage() {
                   to="/forgot-password"
                   variant="body2"
                   underline="hover"
-                  sx={{ color: 'primary.main', fontWeight: 500, fontSize: 13 }}
+                  sx={{ color: 'primary.main', fontWeight: 400, fontSize: 13 }}
                 >
                   Forgot Password?
                 </Link>
@@ -236,9 +198,3 @@ export default function LoginPage() {
   );
 }
 
-const fieldSx = {
-  '& .MuiOutlinedInput-root': {
-    borderRadius: 2,
-    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'primary.main' },
-  },
-};

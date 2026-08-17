@@ -85,22 +85,22 @@ export default function Layout() {
       {/* Drawer brand header */}
       <Box
         sx={{
-          background: 'linear-gradient(135deg, #1d4ed8 0%, #4f46e5 100%)',
+          backgroundColor: '#000000',
           px: 2.5, py: 2.5,
           display: 'flex', alignItems: 'center', gap: 1.5,
         }}
       >
         <Box
           sx={{
-            width: 36, height: 36, borderRadius: 2,
-            background: 'rgba(255,255,255,0.15)',
+            width: 36, height: 36, borderRadius: '11px',
+            bgcolor: 'primary.main',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
           <LocalShippingIcon sx={{ color: 'white', fontSize: 20 }} />
         </Box>
         <Box>
-          <Typography variant="h6" fontWeight={800} sx={{ color: 'white', lineHeight: 1.1, letterSpacing: '-0.3px' }}>
+          <Typography variant="h6" fontWeight={600} sx={{ color: 'white', lineHeight: 1.1, letterSpacing: '-0.02em' }}>
             ShipDesk
           </Typography>
           <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 10 }}>
@@ -114,14 +114,14 @@ export default function Layout() {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <Avatar
             sx={{
-              width: 38, height: 38, fontSize: 14, fontWeight: 700,
-              background: 'linear-gradient(135deg, #1d4ed8, #4f46e5)',
+              width: 38, height: 38, fontSize: 14, fontWeight: 600,
+              bgcolor: 'primary.main',
             }}
           >
             {userInitials}
           </Avatar>
           <Box sx={{ minWidth: 0 }}>
-            <Typography variant="body2" fontWeight={700} noWrap>{user?.fullName}</Typography>
+            <Typography variant="body2" fontWeight={600} noWrap>{user?.fullName}</Typography>
             <Typography variant="caption" color="text.secondary" noWrap>{user?.companyName}</Typography>
           </Box>
         </Box>
@@ -136,7 +136,7 @@ export default function Layout() {
                 variant="overline"
                 sx={{
                   px: 2.5, py: 0.75, display: 'block',
-                  color: 'text.disabled', fontSize: 10, fontWeight: 700, letterSpacing: 1.5,
+                  color: 'text.disabled', fontSize: 10, fontWeight: 600, letterSpacing: 1.5,
                 }}
               >
                 {group}
@@ -161,7 +161,7 @@ export default function Layout() {
                     </ListItemIcon>
                     <ListItemText
                       primary={item.label}
-                      primaryTypographyProps={{ fontSize: 13.5, fontWeight: active ? 700 : 500 }}
+                      primaryTypographyProps={{ fontSize: 13.5, fontWeight: active ? 600 : 400 }}
                     />
                     {active && <KeyboardArrowRightIcon sx={{ fontSize: 16, opacity: 0.7 }} />}
                   </ListItemButton>
@@ -193,8 +193,7 @@ export default function Layout() {
         position="sticky"
         elevation={0}
         sx={{
-          background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #312e81 100%)',
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          backgroundColor: '#000000',
           zIndex: theme.zIndex.drawer + 1,
         }}
       >
@@ -216,8 +215,8 @@ export default function Layout() {
           >
             <Box
               sx={{
-                width: 32, height: 32, borderRadius: 1.5,
-                background: 'rgba(255,255,255,0.15)',
+                width: 32, height: 32, borderRadius: '10px',
+                bgcolor: 'primary.main',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
             >
@@ -225,8 +224,8 @@ export default function Layout() {
             </Box>
             <Typography
               variant="h6"
-              fontWeight={800}
-              sx={{ color: 'white', letterSpacing: '-0.3px', display: { xs: 'none', sm: 'block' } }}
+              fontWeight={600}
+              sx={{ color: 'white', letterSpacing: '-0.02em', display: { xs: 'none', sm: 'block' } }}
             >
               ShipDesk
             </Typography>
@@ -246,14 +245,14 @@ export default function Layout() {
                       component={Link}
                       to={items[0].to}
                       sx={{
-                        color: 'rgba(255,255,255,0.85)',
+                        color: groupActive ? '#fff' : 'rgba(255,255,255,0.75)',
                         textTransform: 'none',
-                        fontWeight: groupActive ? 700 : 500,
+                        fontWeight: groupActive ? 600 : 400,
                         fontSize: 13.5,
-                        borderRadius: 2,
+                        borderRadius: 9999,
                         px: 1.5, py: 0.75,
-                        bgcolor: groupActive ? 'rgba(255,255,255,0.12)' : 'transparent',
-                        '&:hover': { bgcolor: 'rgba(255,255,255,0.1)', color: 'white' },
+                        bgcolor: groupActive ? 'primary.main' : 'transparent',
+                        '&:hover': { bgcolor: groupActive ? 'primary.dark' : 'rgba(255,255,255,0.08)', color: 'white' },
                       }}
                     >
                       {items[0].label}
@@ -267,14 +266,14 @@ export default function Layout() {
                       endIcon={<KeyboardArrowDownIcon sx={{ fontSize: '16px !important' }} />}
                       onClick={(e) => openGroup(group, e.currentTarget)}
                       sx={{
-                        color: 'rgba(255,255,255,0.85)',
+                        color: groupActive ? '#fff' : 'rgba(255,255,255,0.75)',
                         textTransform: 'none',
-                        fontWeight: groupActive ? 700 : 500,
+                        fontWeight: groupActive ? 600 : 400,
                         fontSize: 13.5,
-                        borderRadius: 2,
+                        borderRadius: 9999,
                         px: 1.5, py: 0.75,
-                        bgcolor: groupActive ? 'rgba(255,255,255,0.12)' : 'transparent',
-                        '&:hover': { bgcolor: 'rgba(255,255,255,0.1)', color: 'white' },
+                        bgcolor: groupActive ? 'primary.main' : 'transparent',
+                        '&:hover': { bgcolor: groupActive ? 'primary.dark' : 'rgba(255,255,255,0.08)', color: 'white' },
                       }}
                     >
                       {group}
@@ -287,8 +286,9 @@ export default function Layout() {
                       transformOrigin={{ vertical: 'top', horizontal: 'left' }}
                       PaperProps={{
                         sx: {
-                          mt: 0.5, borderRadius: 2.5, minWidth: 200,
-                          boxShadow: '0 8px 32px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
+                          mt: 0.5, borderRadius: '14px', minWidth: 200,
+                          boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+                          border: '1px solid', borderColor: 'divider',
                           p: 0.5,
                         },
                       }}
@@ -302,10 +302,10 @@ export default function Layout() {
                             to={item.to}
                             onClick={() => closeGroup(group)}
                             sx={{
-                              gap: 1.5, borderRadius: 2, mb: 0.25, px: 1.5, py: 0.9,
+                              gap: 1.5, borderRadius: '8px', mb: 0.25, px: 1.5, py: 0.9,
                               bgcolor: active ? 'primary.50' : 'transparent',
                               color: active ? 'primary.main' : 'text.primary',
-                              fontWeight: active ? 700 : 500,
+                              fontWeight: active ? 600 : 400,
                               fontSize: 13.5,
                               '& .MuiListItemIcon-root': { color: active ? 'primary.main' : 'text.secondary' },
                             }}
@@ -344,8 +344,8 @@ export default function Layout() {
             >
               <Avatar
                 sx={{
-                  width: 30, height: 30, fontSize: 12, fontWeight: 700,
-                  background: 'linear-gradient(135deg, #60a5fa, #818cf8)',
+                  width: 30, height: 30, fontSize: 12, fontWeight: 600,
+                  bgcolor: 'primary.main',
                 }}
               >
                 {userInitials}
@@ -361,8 +361,9 @@ export default function Layout() {
             transformOrigin={{ vertical: 'top', horizontal: 'right' }}
             PaperProps={{
               sx: {
-                mt: 1, borderRadius: 2.5, minWidth: 220,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
+                mt: 1, borderRadius: '14px', minWidth: 220,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+                border: '1px solid', borderColor: 'divider',
                 p: 0.5,
               },
             }}
@@ -372,14 +373,14 @@ export default function Layout() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                 <Avatar
                   sx={{
-                    width: 40, height: 40, fontSize: 15, fontWeight: 700,
-                    background: 'linear-gradient(135deg, #1d4ed8, #4f46e5)',
+                    width: 40, height: 40, fontSize: 15, fontWeight: 600,
+                    bgcolor: 'primary.main',
                   }}
                 >
                   {userInitials}
                 </Avatar>
                 <Box>
-                  <Typography variant="body2" fontWeight={700}>{user?.fullName}</Typography>
+                  <Typography variant="body2" fontWeight={600}>{user?.fullName}</Typography>
                   <Typography variant="caption" color="text.secondary">{user?.companyName}</Typography>
                   <Box sx={{ mt: 0.25 }}>
                     {user?.roles.slice(0, 2).map((r) => (
@@ -394,7 +395,7 @@ export default function Layout() {
 
             <MenuItem
               onClick={() => { setUserAnchor(null); setChangePwOpen(true); }}
-              sx={{ borderRadius: 2, gap: 1.5, py: 1, px: 1.5, fontSize: 13.5 }}
+              sx={{ borderRadius: '8px', gap: 1.5, py: 1, px: 1.5, fontSize: 13.5 }}
             >
               <PersonIcon fontSize="small" sx={{ color: 'text.secondary' }} />
               Change Password
@@ -403,7 +404,7 @@ export default function Layout() {
 
             <MenuItem
               onClick={() => { setUserAnchor(null); logout(); }}
-              sx={{ borderRadius: 2, gap: 1.5, py: 1, px: 1.5, fontSize: 13.5, color: 'error.main' }}
+              sx={{ borderRadius: '8px', gap: 1.5, py: 1, px: 1.5, fontSize: 13.5, color: 'error.main' }}
             >
               <LogoutIcon fontSize="small" />
               Sign Out
