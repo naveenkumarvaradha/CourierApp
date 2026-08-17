@@ -18,7 +18,6 @@ Runs fully locally — no external/production infrastructure required.
 | ORM | Spring Data JPA + Hibernate | via Spring Boot 3.5.3 |
 | Migrations | Flyway | via Spring Boot |
 | Cache | Redis + Spring Cache (Jedis) | 5+ |
-| MFA (2FA) | TOTP — Google Authenticator | totp-spring-boot-starter 1.7.1 |
 | PDF Generation | OpenPDF | 1.3.39 |
 | Excel Export | Apache POI | 5.3.0 |
 | Barcode | ZXing | 3.5.3 |
@@ -95,8 +94,7 @@ CourierApp/
 
 | Module | Description |
 |---|---|
-| **Auth** | JWT login, refresh tokens, MFA (TOTP), password reset, account lockout |
-| **MFA Management** | Admin can force / disable / reset MFA per user |
+| **Auth** | JWT login, refresh tokens, password reset, account lockout |
 | **Bookings** | Create, submit, approve, track courier bookings (multi-level approval) |
 | **Parties** | Sender/receiver address book with approval workflow |
 | **Units** | Company branch/office addresses; selectable as booking sender and DC sender/receiver |
@@ -124,14 +122,15 @@ Browser
 
 ### Auth Flow
 ```
-POST /api/auth/login
-  → password OK + MFA enabled  → mfaRequired=true  + mfaPendingToken
-  → password OK + MFA forced   → mfaSetupRequired=true + accessToken → redirect to /profile/mfa
-  → password OK, no MFA        → accessToken (15 min) + refreshToken (7 days)
-
+POST /api/auth/login    → accessToken (15 min) + refreshToken (7 days)
 POST /api/auth/refresh  → new accessToken
 POST /api/auth/logout   → token blacklisted in Redis
 ```
+
+> MFA (TOTP) was implemented at one point (see V28–V32 migrations) but was fully removed in
+> V33 — the `mfa_secret`/`mfa_enabled`/`mfa_forced` columns are dropped and no MFA code
+> remains in the backend or frontend. Login only ever returns a token pair, never an MFA
+> challenge.
 
 ---
 
@@ -228,9 +227,9 @@ Flyway runs automatically on startup. Files in `backend/src/main/resources/db/mi
 | V1–V10 | Core schema: users, roles, permissions, companies, bookings, parties |
 | V11 | Add `company_id` to users |
 | V22 | Add `company_id` to parties |
-| V30 | Disable all MFA (reset during migration) |
+| V28–V32 | MFA (TOTP) implemented, then reset/reworked |
 | V31 | Performance indexes |
-| V32 | Add `mfa_forced` column to users |
+| V33 | MFA fully removed — `mfa_secret`/`mfa_enabled`/`mfa_forced` columns dropped |
 | V34 | Company `units` table + backfill from company settings |
 | V35 | Add `unit_id` to bookings |
 | V36 | Delivery Challan module: `delivery_challans`, `dc_sequence`, permissions |
