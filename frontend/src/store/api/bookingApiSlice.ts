@@ -3,6 +3,14 @@ import type { Booking, PageResponse } from '../../types';
 
 type BookingFilters = Record<string, string | number | boolean | undefined | null>;
 
+export interface TrackingEvent {
+  provider: string;
+  status: string;
+  description: string | null;
+  location: string | null;
+  eventTime: string | null;
+}
+
 export const bookingApiSlice = baseApi.injectEndpoints({
   endpoints: (build) => ({
     searchBookings: build.query<PageResponse<Booking>, BookingFilters>({
@@ -64,6 +72,10 @@ export const bookingApiSlice = baseApi.injectEndpoints({
       query: (id) => ({ url: `/bookings/${id}/reject-cancellation`, method: 'POST' }),
       invalidatesTags: (_r, _e, id) => [{ type: 'Booking', id }, 'Booking', 'DashboardTasks'],
     }),
+    getTracking: build.query<TrackingEvent[], number>({
+      query: (id) => ({ url: `/bookings/${id}/tracking` }),
+      providesTags: (_r, _e, id) => [{ type: 'Tracking' as const, id }],
+    }),
   }),
 });
 
@@ -82,4 +94,5 @@ export const {
   useRequestCancellationMutation,
   useApproveCancellationMutation,
   useRejectCancellationMutation,
+  useLazyGetTrackingQuery,
 } = bookingApiSlice;

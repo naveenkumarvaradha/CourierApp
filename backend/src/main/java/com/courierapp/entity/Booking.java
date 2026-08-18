@@ -86,6 +86,12 @@ public class Booking extends Auditable {
     @Column(name = "awb_number", unique = true, length = 60)
     private String awbNumber;
 
+    @Column(name = "last_tracked_at")
+    private java.time.OffsetDateTime lastTrackedAt;
+
+    @Column(name = "tracking_status", length = 100)
+    private String trackingStatus;
+
     @Column(name = "approver_username", length = 60)
     private String approverUsername;
 

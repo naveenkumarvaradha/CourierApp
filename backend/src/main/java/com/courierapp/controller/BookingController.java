@@ -44,17 +44,27 @@ public class BookingController {
     private final ApprovalAuthorizationService approvalAuthorizationService;
     private final UserRepository userRepository;
     private final AdminService adminService;
+    private final com.courierapp.service.tracking.TrackingService trackingService;
 
     public BookingController(BookingService bookingService,
                              BookingRepository bookingRepository,
                              ApprovalAuthorizationService approvalAuthorizationService,
                              UserRepository userRepository,
-                             AdminService adminService) {
+                             AdminService adminService,
+                             com.courierapp.service.tracking.TrackingService trackingService) {
         this.bookingService = bookingService;
         this.bookingRepository = bookingRepository;
         this.approvalAuthorizationService = approvalAuthorizationService;
         this.userRepository = userRepository;
         this.adminService = adminService;
+        this.trackingService = trackingService;
+    }
+
+    @GetMapping("/{id}/tracking")
+    @PreAuthorize("hasAuthority('BOOKING_VIEW')")
+    @Operation(summary = "Fetch live tracking events from the carrier (DHL/Maruti) and return full history")
+    public java.util.List<com.courierapp.dto.tracking.TrackingEventResponse> tracking(@PathVariable Long id) {
+        return trackingService.trackAndSync(id);
     }
 
     @GetMapping
