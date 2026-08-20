@@ -4,7 +4,6 @@ import {
   Box,
   Button,
   Chip,
-  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -30,7 +29,6 @@ import SendIcon from '@mui/icons-material/Send';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import CancelIcon from '@mui/icons-material/Cancel';
-import TimelineIcon from '@mui/icons-material/Timeline';
 import { bookingApi } from '../../api/endpoints';
 import { extractErrorMessage, extractBlobError } from '../../api/client';
 import {
@@ -43,9 +41,7 @@ import {
   useRequestCancellationMutation,
   useApproveCancellationMutation,
   useRejectCancellationMutation,
-  useLazyGetTrackingQuery,
 } from '../../store/api/bookingApiSlice';
-import type { TrackingEvent } from '../../store/api/bookingApiSlice';
 import { useNotification } from '../../context/NotificationContext';
 import { useAuth } from '../../context/AuthContext';
 import { useColumnVisibility } from '../../hooks/useColumnVisibility';
@@ -125,10 +121,6 @@ export default function BookingsPage() {
 
   // Cancellation approval dialog
   const [cancelApproval, setCancelApproval] = useState<{ id: number; action: 'approve' | 'reject' } | null>(null);
-
-  // Tracking dialog
-  const [trackDialog, setTrackDialog] = useState<{ id: number; bookingNumber: string } | null>(null);
-  const [fetchTracking, trackingResult] = useLazyGetTrackingQuery();
 
   const printSticker = useCallback(async (b: Booking) => {
     if (!b.awbNumber) {
@@ -287,14 +279,6 @@ export default function BookingsPage() {
               <Tooltip title={b.printTaken ? 'Reprint sticker' : 'Print sticker'}>
                 <IconButton size="small" color={b.printTaken ? 'default' : 'primary'} onClick={() => printSticker(b)}>
                   <PrintIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            )}
-            {hasAwb && (
-              <Tooltip title="Track shipment">
-                <IconButton size="small" color="info"
-                  onClick={() => { setTrackDialog({ id: b.id, bookingNumber: b.bookingNumber }); fetchTracking(b.id); }}>
-                  <TimelineIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
             )}
@@ -461,51 +445,6 @@ export default function BookingsPage() {
             color={cancelApproval?.action === 'approve' ? 'error' : 'success'}
             onClick={confirmCancelApproval}>
             {cancelApproval?.action === 'approve' ? 'Cancel Booking' : 'Reject & Restore'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Tracking timeline */}
-      <Dialog open={!!trackDialog} onClose={() => setTrackDialog(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>Track Shipment — {trackDialog?.bookingNumber}</DialogTitle>
-        <DialogContent>
-          {trackingResult.isFetching && (
-            <Stack alignItems="center" py={4}><CircularProgress size={28} /></Stack>
-          )}
-          {trackingResult.isError && (
-            <Typography color="error" variant="body2">
-              {(trackingResult.error as { data?: { message?: string } })?.data?.message
-                ?? 'Failed to fetch tracking'}
-            </Typography>
-          )}
-          {trackingResult.isSuccess && trackingResult.data.length === 0 && (
-            <Typography variant="body2" color="text.secondary">No tracking events yet.</Typography>
-          )}
-          {trackingResult.isSuccess && trackingResult.data.length > 0 && (
-            <Stack spacing={1.5} mt={1}>
-              {trackingResult.data.map((ev: TrackingEvent, i: number) => (
-                <Box key={i} sx={{ borderLeft: 3, borderColor: i === 0 ? 'primary.main' : 'divider', pl: 1.5, py: 0.5 }}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Chip size="small" label={ev.provider} variant="outlined" />
-                    <Typography variant="subtitle2">{ev.status.replace(/_/g, ' ')}</Typography>
-                  </Stack>
-                  {ev.description && (
-                    <Typography variant="body2" color="text.secondary">{ev.description}</Typography>
-                  )}
-                  <Typography variant="caption" color="text.disabled">
-                    {ev.eventTime ? new Date(ev.eventTime).toLocaleString() : ''}
-                    {ev.location ? ` · ${ev.location}` : ''}
-                  </Typography>
-                </Box>
-              ))}
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setTrackDialog(null)}>Close</Button>
-          <Button variant="outlined" disabled={!trackDialog || trackingResult.isFetching}
-            onClick={() => trackDialog && fetchTracking(trackDialog.id)}>
-            Refresh
           </Button>
         </DialogActions>
       </Dialog>
